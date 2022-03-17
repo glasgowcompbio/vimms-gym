@@ -3,8 +3,8 @@
 The choice of fragmentation strategy used for data acquisition in untargeted metabolomics greatly
 affects the coverage and spectral quality of identified metabolites. In a typical strategy for
 data-dependant acquisition, the most *N* intense ions (Top-N) in the survey MS1 scan are chosen for
-fragmentation. This strategy is not entirely data-driven as it is unable to adapt to changes in
-incoming signals when deciding which ions to target for fragmentation.
+fragmentation. This strategy is not entirely data-driven as it is unable to learn and adapt to changes 
+in incoming signals when deciding which ions to target for fragmentation.
 
 [Reinforcement learning](https://en.wikipedia.org/wiki/Reinforcement_learning) has been widely used
 to train intelligent agents that manage the operations of various scientific
