@@ -69,20 +69,15 @@ class DDAEnv(gym.Env):
         Defines observation spaces of m/z, RT and intensity values
         """
         combined_spaces = spaces.Dict({
-            'intensities': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'intensities': spaces.Box(low=0, high=np.inf, shape=(self.max_peaks,)),
             'ms_level': spaces.Box(low=1, high=2, shape=(1,)),    
             'fragmented': spaces.MultiBinary(self.max_peaks),
-            'excluded': spaces.MultiBinary(self.max_peaks),
-            'above_min_intensity': spaces.MultiBinary(self.max_peaks),
+            'excluded': spaces.Box(low=0, high=np.inf, shape=(self.max_peaks,)),
             'valid_actions': spaces.MultiBinary(self.in_dim),
-            'fragmented_above': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'fragmented_below': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'unfragmented_above': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'unfragmented_below': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'excluded_above': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'excluded_below': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'fragmented_excluded_above': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'fragmented_excluded_below': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
+            'fragmented_count': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
+            'unfragmented_count': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
+            'excluded_count': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
+            'unexcluded_count': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
             'elapsed_scans_since_start': spaces.Box(low=0, high=np.inf, shape=(1,)),
             'elapsed_scans_since_last_ms1': spaces.Box(low=0, high=np.inf, shape=(1,)),
         })
@@ -94,16 +89,11 @@ class DDAEnv(gym.Env):
             'ms_level': np.zeros(1),
             'fragmented': np.zeros(self.max_peaks),
             'excluded': np.zeros(self.max_peaks),
-            'above_min_intensity': np.zeros(self.max_peaks),
             'valid_actions': np.zeros(self.in_dim),
-            'fragmented_above': np.zeros(1),
-            'fragmented_below': np.zeros(1),
-            'unfragmented_above': np.zeros(1),
-            'unfragmented_below': np.zeros(1),
-            'excluded_above': np.zeros(1),
-            'excluded_below': np.zeros(1),
-            'fragmented_excluded_above': np.zeros(1),
-            'fragmented_excluded_below': np.zeros(1),
+            'fragmented_count': np.zeros(1),
+            'unfragmented_count': np.zeros(1),
+            'excluded_count': np.zeros(1),
+            'unexcluded_count': np.zeros(1),
             'elapsed_scans_since_start': np.zeros(1),
             'elapsed_scans_since_last_ms1': np.zeros(1)
         }
@@ -136,13 +126,18 @@ class DDAEnv(gym.Env):
                 mz = mzs[i]
                 original_intensity = intensities[i]
                 if max_intensity > 0:
-                    scaled_intensity = original_intensity / max_intensity
-                fragmented = 0  # initially nothing has been fragmented
-                is_excluded, weight = self.exclusion.is_excluded(mz, rt)
-                excluded = 1 if is_excluded else 0
+                    scaled_intensity = np.log(original_intensity)
+
+                # initially nothing has been fragmented
+                fragmented = 0
+
+                # update exclusion elapsed time for all features
+                current_rt = scan_to_process.rt
+                excluded = self._get_elapsed_time_since_exclusion(mz, current_rt)
+
                 above_min_intensity = 1 if original_intensity > self.min_ms1_intensity else 0
-                feature = Feature(mz, rt, original_intensity, scaled_intensity, 
-                fragmented, excluded, above_min_intensity)
+                feature = Feature(mz, rt, original_intensity, scaled_intensity,
+                                  fragmented, excluded, above_min_intensity)
                 features.append(feature)
             self.features = features
 
@@ -154,7 +149,6 @@ class DDAEnv(gym.Env):
                 state['intensities'][i] = f.scaled_intensity
                 state['fragmented'][i] = f.fragmented
                 state['excluded'][i] = f.excluded
-                state['above_min_intensity'][i] = f.above_min_intensity
                 state['valid_actions'][i] = 1 # fragmentable
 
             state['ms_level'][0] = 1
@@ -170,9 +164,19 @@ class DDAEnv(gym.Env):
             # update fragmented count
             state['fragmented'][idx] += 1
 
-            # update exclusion
-            state['excluded'][idx] = 1
-            self.exclusion.update(dda_action.mz, dda_action.rt)
+            # update exclusion for the selected feature
+            current_rt = scan_to_process.rt
+            try:
+                f = self.features[idx]
+                self.exclusion.update(f.mz, f.rt)
+            except IndexError: # idx selects a non-existing feature
+                pass
+
+            # update exclusion elapsed time for all features
+            for i in range(len(self.features)):
+                f = self.features[i]
+                excluded = self._get_elapsed_time_since_exclusion(f.mz, current_rt)
+                state['excluded'][i] = excluded
 
             state['ms_level'][0] = 2
             self.elapsed_scans_since_last_ms1 += 1
@@ -180,46 +184,38 @@ class DDAEnv(gym.Env):
         state['valid_actions'][-1] = 1  # ms1 action is always valid
         return state
 
+    def _get_elapsed_time_since_exclusion(self, mz, current_rt):
+        """
+        Get elapsed time since last exclusion
+        if there are multiple boxes, choose the earliest one
+        """
+        excluded = 0.0
+        boxes = self.exclusion.exclusion_list.check_point(mz, current_rt)
+        if len(boxes) > 0:
+            frag_ats = [b.frag_at for b in boxes]
+            last_frag_at = min(frag_ats)
+            # print(mz, current_rt, last_frag_at)
+            excluded = current_rt - last_frag_at
+        return excluded
+
     def _update_counts(self, state):
 
-        # count fragmented above min intensity
-        fragmented_above = np.sum((state['fragmented'] == 1) & (state['above_min_intensity'] == 1))
+        # count fragmented
+        fragmented_count = np.count_nonzero(state['fragmented'] > 0)
 
-        # count fragmented below min intensity
-        fragmented_below = np.sum((state['fragmented'] == 1) & (state['above_min_intensity'] == 0))
+        # count unfragmented
+        unfragmented_count = np.count_nonzero(state['fragmented'] == 0)
 
-        # count unfragmented above min intensity
-        unfragmented_above = np.sum(
-            (state['fragmented'] == 0) & (state['above_min_intensity'] == 1))
+        # count excluded
+        excluded_count = np.count_nonzero(state['excluded'] > 0)
 
-        # count unfragmented below min intensity
-        unfragmented_below = np.sum(
-            (state['fragmented'] == 0) & (state['above_min_intensity'] == 0))
+        # count non-excluded
+        unexcluded_count = np.count_nonzero(state['excluded'] == 0)
 
-        # count excluded above min intensity
-        excluded_above = np.sum((state['excluded'] == 1) & (state['above_min_intensity'] == 1))
-
-        # count excluded below min intensity
-        excluded_below = np.sum((state['excluded'] == 1) & (state['above_min_intensity'] == 0))
-
-        # count fragmented and excluded above min intensity
-        fragmented_excluded_above = np.sum(
-            (state['fragmented'] == 1) & (state['excluded'] == 1) & (
-                    state['above_min_intensity'] == 1))
-
-        # count fragmented and excluded below min intensity
-        fragmented_excluded_below = np.sum(
-            (state['fragmented'] == 1) & (state['excluded'] == 1) & (
-                    state['above_min_intensity'] == 0))
-
-        state['fragmented_above'][0] = fragmented_above
-        state['fragmented_below'][0] = fragmented_below
-        state['unfragmented_above'][0] = unfragmented_above
-        state['unfragmented_below'][0] = unfragmented_below
-        state['excluded_above'][0] = excluded_above
-        state['excluded_below'][0] = excluded_below
-        state['fragmented_excluded_above'][0] = fragmented_excluded_above
-        state['fragmented_excluded_below'][0] = fragmented_excluded_below
+        state['fragmented_count'][0] = fragmented_count
+        state['unfragmented_count'][0] = unfragmented_count
+        state['excluded_count'][0] = excluded_count
+        state['unexcluded_count'][0] = unexcluded_count
         state['elapsed_scans_since_start'][0] = self.elapsed_scans_since_start
         state['elapsed_scans_since_last_ms1'][0] = self.elapsed_scans_since_last_ms1
 
@@ -357,7 +353,7 @@ class DDAEnv(gym.Env):
                 # if ms2 and schedule ms1 ...
                 if self.current_scan.ms_level == 2:
                     # give reward proportional to the number of unexcluded precursors in the ms1 scan
-                    excluded_count = float(self.state['excluded_above'] + self.state['excluded_below'])
+                    excluded_count = float(self.state['excluded_count'])
                     reward = (self.max_peaks - excluded_count) / self.max_peaks
                 else:
                     # repeated scheduling of MS1 is not desirable
