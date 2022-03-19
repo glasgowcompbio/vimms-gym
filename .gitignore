@@ -118,3 +118,4 @@ notebooks/results
 .idea
 *.mzML
 Pipfile.lock
+notebooks/results*
