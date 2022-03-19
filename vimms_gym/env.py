@@ -21,6 +21,7 @@ from vimms_gym.features import CleanerTopNExclusion, Feature
 REPEATED_MS1_REWARD = -0.1
 REPEATED_FRAG_REWARD = -10
 INVALID_MOVE_REWARD = -1
+MAX_OBSERVED_LOG_INTENSITY = 25
 
 class DDAEnv(gym.Env):
     """
@@ -50,7 +51,6 @@ class DDAEnv(gym.Env):
 
         self.mz_tol = self.env_params['mz_tol']
         self.rt_tol = self.env_params['rt_tol']
-        self.min_ms1_intensity = self.env_params['min_ms1_intensity']
         self.isolation_window = self.env_params['isolation_window']
 
         self.mass_spec = None
@@ -115,9 +115,6 @@ class DDAEnv(gym.Env):
 
             # new ms1 scan, so initialise a new state
             mzs, rt, intensities = self._get_mzs_rt_intensities(scan_to_process)
-            max_intensity = 0
-            if len(intensities) > 0:
-                max_intensity = max(intensities)
 
             # get the N most intense features first
             features = []
@@ -125,8 +122,8 @@ class DDAEnv(gym.Env):
             for i in sorted_indices[0:self.max_peaks]:
                 mz = mzs[i]
                 original_intensity = intensities[i]
-                if max_intensity > 0:
-                    scaled_intensity = np.log(original_intensity)
+                scaled_intensity = self._clip_value(np.log(original_intensity),
+                                                    MAX_OBSERVED_LOG_INTENSITY)
 
                 # initially nothing has been fragmented
                 fragmented = 0
@@ -135,9 +132,8 @@ class DDAEnv(gym.Env):
                 current_rt = scan_to_process.rt
                 excluded = self._get_elapsed_time_since_exclusion(mz, current_rt)
 
-                above_min_intensity = 1 if original_intensity > self.min_ms1_intensity else 0
                 feature = Feature(mz, rt, original_intensity, scaled_intensity,
-                                  fragmented, excluded, above_min_intensity)
+                                  fragmented, excluded)
                 features.append(feature)
             self.features = features
 
@@ -381,16 +377,20 @@ class DDAEnv(gym.Env):
                     if intensity_diff > 1:
                         reward = intensity_diff
                         self.frag_chem_intensity[chem] = new_intensity
-                    reward = self._clip_reward(reward, 10)
+                    reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
 
-        assert -1 <= reward <= 1
+        assert -1.0 <= reward <= 1
         return reward
 
-    def _clip_reward(self, reward, max_reward):
-        # clip reward to [-1, 1]
-        reward = min(reward, max_reward) if reward >= 0 else max(reward, -max_reward)
-        reward = reward / max_reward
-        return reward
+    def _clip_value(self, value, max_value):
+        # clip value to [-1, 1]
+        value = min(value, max_value) if value >= 0 else max(value, -max_value)
+        value = value / max_value
+        if value > 1.0:
+            value = 1.0
+        elif value < -1.0:
+            value = -1.0
+        return value
 
     def reset(self, chems=None):
         """

@@ -6,14 +6,13 @@ from vimms.Exclusion import TopNExclusion
 class Feature():
     def __init__(
         self, mz, rt, original_intensity, scaled_intensity, 
-        fragmented, excluded, above_min_intensity):
+        fragmented, excluded):
         self.mz = mz
         self.rt = rt
         self.scaled_intensity = scaled_intensity
         self.original_intensity = original_intensity
         self.fragmented = fragmented
         self.excluded = excluded
-        self.above_min_intensity = above_min_intensity
 
     def __repr__(self):
         return f'mz={self.mz} rt={self.rt} intensity={self.original_intensity} ({self.scaled_intensity})'
