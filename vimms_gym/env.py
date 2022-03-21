@@ -18,9 +18,12 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
+MS1_REWARD = 0.1
 REPEATED_MS1_REWARD = -0.1
-REPEATED_FRAG_REWARD = -10
-INVALID_MOVE_REWARD = -1
+REPEATED_FRAG_REWARD = -0.1
+INVALID_MOVE_REWARD = -1.0
+
+INTENSITY_DIFF_THRESHOLD = 1
 MAX_OBSERVED_LOG_INTENSITY = 25
 
 class DDAEnv(gym.Env):
@@ -42,12 +45,6 @@ class DDAEnv(gym.Env):
         self.chemical_creator_params = params['chemical_creator']
         self.noise_params = params['noise']
         self.env_params = params['env']
-        self.repeated_ms1_reward = params['ms1_reward'] \
-            if 'ms1_reward' in params else REPEATED_MS1_REWARD
-        self.invalid_move_reward = params['invalid_move_reward'] \
-            if 'invalid_move_reward' in params else INVALID_MOVE_REWARD
-        self.repeated_frag_reward = params['repeated_frag_reward'] \
-            if 'repeated_frag_reward' in params else REPEATED_FRAG_REWARD
 
         self.mz_tol = self.env_params['mz_tol']
         self.rt_tol = self.env_params['rt_tol']
@@ -192,6 +189,8 @@ class DDAEnv(gym.Env):
             last_frag_at = min(frag_ats)
             # print(mz, current_rt, last_frag_at)
             excluded = current_rt - last_frag_at
+            
+        excluded = self._clip_value(excluded, self.rt_tol)
         return excluded
 
     def _update_counts(self, state):
@@ -339,7 +338,7 @@ class DDAEnv(gym.Env):
 
         # if not a valid move, give a large negative reward
         if not is_valid:
-            reward = self.invalid_move_reward
+            reward = INVALID_MOVE_REWARD
         else:
 
             # if ms1, give constant positive reward
@@ -348,12 +347,16 @@ class DDAEnv(gym.Env):
 
                 # if ms2 and schedule ms1 ...
                 if self.current_scan.ms_level == 2:
+                    # constant reward
+                    reward = MS1_REWARD
+
                     # give reward proportional to the number of unexcluded precursors in the ms1 scan
-                    excluded_count = float(self.state['excluded_count'])
-                    reward = (self.max_peaks - excluded_count) / self.max_peaks
+                    # excluded_count = float(self.state['excluded_count'])
+                    # reward = (self.max_peaks - excluded_count) / self.max_peaks
+
                 else:
                     # repeated scheduling of MS1 is not desirable
-                    reward = self.repeated_ms1_reward
+                    reward = REPEATED_MS1_REWARD
 
             # if ms2, give fragmented chemical intensity as the reward
             elif dda_action.ms_level == 2:
@@ -365,19 +368,22 @@ class DDAEnv(gym.Env):
 
                     # compute the current fragmented intensity for this chem
                     new_intensity = np.log(np.sum(frag_event.parents_intensity))
-                    self.frag_chem_intensity[chem] = new_intensity
 
                     # calculate difference between successive fragmentations of the same chem
                     # intensity_diff = new_intensity - prev_intensity
                     # reward = intensity_diff
+                    # self.frag_chem_intensity[chem] = new_intensity
+                    # reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
 
                     # alternative thresholded reward scheme
-                    reward = self.repeated_frag_reward
                     intensity_diff = new_intensity - prev_intensity
-                    if intensity_diff > 1:
+                    if intensity_diff > INTENSITY_DIFF_THRESHOLD:
                         reward = intensity_diff
                         self.frag_chem_intensity[chem] = new_intensity
-                    reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
+                        reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
+                    else:
+                        reward = REPEATED_FRAG_REWARD
+
 
         assert -1.0 <= reward <= 1
         return reward
