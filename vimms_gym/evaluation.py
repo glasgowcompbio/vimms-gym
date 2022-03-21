@@ -1,24 +1,43 @@
-import numpy as np
 from vimms.Evaluation import evaluate_simulated_env
 
-
-def get_ppo_action_probs(model, state):
-    # https://stackoverflow.com/questions/66428307/how-to-get-action-propability-in-stable-baselines-3
-    obs = model.policy.obs_to_tensor(state)[0]
-    dis = model.policy.get_distribution(obs)
-    probs = dis.distribution.probs
-    probs_np = probs.detach().numpy()
-    return probs_np
-
-
-def get_ppo_best_valid_action(model, observation):
-    valid_actions = observation['valid_actions']
-    action_probs = get_ppo_action_probs(model, observation)
-    valid_probs = action_probs * valid_actions  # set invalid actions to have 0s
-    best_valid_action = np.argmax(valid_probs)
-    return best_valid_action
+from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, best_ppo_policy
 
 
 def evaluate(env):
     res = evaluate_simulated_env(env.vimms_env)
     return res['coverage_proportion'], res['intensity_proportion']
+
+
+def evaluate_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=5000, model=None):
+    if method in ['DQN', 'PPO']:
+        assert model is not None
+
+    for i in range(len(chem_list)):
+        chems = chem_list[i]
+        observation = env.reset(chems=chems)
+        done = False
+        num_steps = 0
+        episode_reward = 0
+
+        while not done:
+
+            if method == 'random':
+                action = random_policy(observation)
+            elif method == 'fullscan':
+                action = fullscan_policy(observation)
+            elif method == 'TopN':
+                action = topN_policy(observation, env.features, N, min_ms1_intensity)
+            elif method == 'DQN':
+                action, _states = model.predict(observation, deterministic=True)
+            elif method == 'PPO':
+                action = best_ppo_policy(observation, model)
+
+            observation, reward, done, info = env.step(action)
+            num_steps += 1
+            episode_reward += reward
+            if done:
+                print(f'Episode {i} finished after {num_steps} timesteps with reward {episode_reward}')
+                out_file = '%s_%d.mzML' % (method, i)
+                env.write_mzML(out_dir, out_file)
+                print(evaluate(env))
+                break

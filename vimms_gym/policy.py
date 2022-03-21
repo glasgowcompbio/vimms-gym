@@ -1,6 +1,5 @@
 import numpy as np
 
-from vimms_gym.evaluation import get_ppo_action_probs
 from vimms_gym.features import obs_to_dfs
 
 
@@ -9,7 +8,7 @@ def fullscan_policy(obs):
     A policy function that generates only fullscan data.
     """
     valid_actions = obs['valid_actions']
-    ms1_action = len(valid_actions)-1 # last index is always the action for MS1 scan
+    ms1_action = len(valid_actions) - 1  # last index is always the action for MS1 scan
     return ms1_action
 
 
@@ -62,5 +61,22 @@ def best_ppo_policy(obs, model):
     valid_actions = obs['valid_actions']
     action_probs = get_ppo_action_probs(model, obs)
     valid_probs = action_probs * valid_actions  # set invalid actions to 0 probabilities
+    best_valid_action = np.argmax(valid_probs)
+    return best_valid_action
+
+
+def get_ppo_action_probs(model, state):
+    # https://stackoverflow.com/questions/66428307/how-to-get-action-propability-in-stable-baselines-3
+    obs = model.policy.obs_to_tensor(state)[0]
+    dis = model.policy.get_distribution(obs)
+    probs = dis.distribution.probs
+    probs_np = probs.detach().numpy()
+    return probs_np
+
+
+def get_ppo_best_valid_action(model, observation):
+    valid_actions = observation['valid_actions']
+    action_probs = get_ppo_action_probs(model, observation)
+    valid_probs = action_probs * valid_actions  # set invalid actions to have 0s
     best_valid_action = np.argmax(valid_probs)
     return best_valid_action
