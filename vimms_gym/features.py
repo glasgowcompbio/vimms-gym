@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from vimms.Exclusion import TopNExclusion
 
@@ -31,7 +32,7 @@ class CleanerTopNExclusion(TopNExclusion):
             self.exclusion_list.add_box(x)
 
 
-def obs_to_dfs(obs):
+def obs_to_dfs(obs, features):
     scan_obs = {}
     count_obs = {}
     for key in obs:
@@ -44,7 +45,17 @@ def obs_to_dfs(obs):
             scan_obs[key] = val
 
     scan_df = pd.DataFrame(scan_obs)
+
+    # set the original log intensity values to scan_df too
+    log_intensities = np.zeros(len(scan_df))
+    for i in range(len(features)):
+        f = features[i]
+        log_intensities[i] = np.log(f.original_intensity)
+    scan_df['log_intensities'] = log_intensities
+
+    # create a dataframe to hold various counts
     count_df = pd.DataFrame(count_obs)
     count_df = count_df.transpose()
     count_df.rename(columns={0: 'counts'}, inplace=True)
+
     return scan_df, count_df

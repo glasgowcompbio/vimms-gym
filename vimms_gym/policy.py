@@ -28,16 +28,16 @@ def random_policy(obs):
     return action
 
 
-def topN_policy(obs, N, min_ms1_intensity):
+def topN_policy(obs, features, N, min_ms1_intensity):
     """
     A policy function that performs TopN selection from the observation.
     """
     # turn observation dictionary to dataframe
-    scan_df, count_df = obs_to_dfs(obs)
+    scan_df, count_df = obs_to_dfs(obs, features)
 
     # set an indicator column for min intensity check
     scan_df['above_min_intensity'] = 1
-    scan_df.loc[scan_df['intensities'] < np.log(min_ms1_intensity), 'above_min_intensity'] = 0
+    scan_df.loc[scan_df['log_intensities'] < np.log(min_ms1_intensity), 'above_min_intensity'] = 0
 
     # check whether N ions have been fragmented
     fragmented_count = count_df.loc['fragmented_count'].values[0]
