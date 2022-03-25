@@ -1,19 +1,17 @@
-from abc import abstractmethod
-from collections import defaultdict
-from random import randrange
-
 import gym
 import numpy as np
 import pylab as plt
+from abc import abstractmethod
+from collections import defaultdict
 from gym import spaces
 from loguru import logger
+from random import randrange
 from vimms.ChemicalSamplers import UniformMZFormulaSampler, UniformRTAndIntensitySampler
 from vimms.Chemicals import ChemicalMixtureCreator
 from vimms.Common import set_log_level_warning
 from vimms.Controller import AgentBasedController
 from vimms.Environment import Environment
 from vimms.MassSpec import IndependentMassSpectrometer
-
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.features import CleanerTopNExclusion, Feature
@@ -25,6 +23,7 @@ INVALID_MOVE_REWARD = -1.0
 
 INTENSITY_DIFF_THRESHOLD = 1
 MAX_OBSERVED_LOG_INTENSITY = 25
+
 
 class DDAEnv(gym.Env):
     """
@@ -67,7 +66,7 @@ class DDAEnv(gym.Env):
         """
         combined_spaces = spaces.Dict({
             'intensities': spaces.Box(low=0, high=np.inf, shape=(self.max_peaks,)),
-            'ms_level': spaces.Box(low=1, high=2, shape=(1,)),    
+            'ms_level': spaces.Box(low=1, high=2, shape=(1,)),
             'fragmented': spaces.MultiBinary(self.max_peaks),
             'excluded': spaces.Box(low=0, high=np.inf, shape=(self.max_peaks,)),
             'valid_actions': spaces.MultiBinary(self.in_dim),
@@ -82,17 +81,17 @@ class DDAEnv(gym.Env):
 
     def _initial_state(self):
         features = {
-            'intensities': np.zeros(self.max_peaks),
-            'ms_level': np.zeros(1),
+            'intensities': np.zeros(self.max_peaks, dtype=np.float32),
+            'ms_level': np.zeros(1, dtype=np.float32),
             'fragmented': np.zeros(self.max_peaks),
-            'excluded': np.zeros(self.max_peaks),
-            'valid_actions': np.zeros(self.in_dim),
-            'fragmented_count': np.zeros(1),
-            'unfragmented_count': np.zeros(1),
-            'excluded_count': np.zeros(1),
-            'unexcluded_count': np.zeros(1),
-            'elapsed_scans_since_start': np.zeros(1),
-            'elapsed_scans_since_last_ms1': np.zeros(1)
+            'excluded': np.zeros(self.max_peaks, dtype=np.float32),
+            'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
+            'fragmented_count': np.zeros(1, dtype=np.float32),
+            'unfragmented_count': np.zeros(1, dtype=np.float32),
+            'excluded_count': np.zeros(1, dtype=np.float32),
+            'unexcluded_count': np.zeros(1, dtype=np.float32),
+            'elapsed_scans_since_start': np.zeros(1, dtype=np.float32),
+            'elapsed_scans_since_last_ms1': np.zeros(1, dtype=np.float32)
         }
         return features
 
@@ -142,7 +141,7 @@ class DDAEnv(gym.Env):
                 state['intensities'][i] = f.scaled_intensity
                 state['fragmented'][i] = f.fragmented
                 state['excluded'][i] = f.excluded
-                state['valid_actions'][i] = 1 # fragmentable
+                state['valid_actions'][i] = 1  # fragmentable
 
             state['ms_level'][0] = 1
             self.elapsed_scans_since_last_ms1 = 0
@@ -162,7 +161,7 @@ class DDAEnv(gym.Env):
             try:
                 f = self.features[idx]
                 self.exclusion.update(f.mz, f.rt)
-            except IndexError: # idx selects a non-existing feature
+            except IndexError:  # idx selects a non-existing feature
                 pass
 
             # update exclusion elapsed time for all features
@@ -189,7 +188,7 @@ class DDAEnv(gym.Env):
             last_frag_at = min(frag_ats)
             # print(mz, current_rt, last_frag_at)
             excluded = current_rt - last_frag_at
-            
+
         excluded = self._clip_value(excluded, self.rt_tol)
         return excluded
 
@@ -300,7 +299,7 @@ class DDAEnv(gym.Env):
             # if yes, give negative reward (later) and advance the state of simulation by
             # doing an ms1 scan
             dda_action = self.controller.agent.target_ms2(target_mz, target_rt,
-                                                          target_original_intensity, 
+                                                          target_original_intensity,
                                                           target_scaled_intensity, idx)
             if not dda_action.valid:
                 is_valid = False
@@ -366,7 +365,7 @@ class DDAEnv(gym.Env):
                     # 1. coverage-like reward scheme
                     ###############################################################################
 
-                    # # look up previous fragmented intensity for this chem
+                    # look up previous fragmented intensity for this chem
                     # chem = frag_event.chem
                     # prev_intensity = self.frag_chem_intensity[chem]
                     # if np.isclose(prev_intensity, 0.0): # never been fragmented before
@@ -381,36 +380,37 @@ class DDAEnv(gym.Env):
                     # 2. alternative thresholded reward scheme
                     ###############################################################################
 
-                    chem = frag_event.chem
-                    prev_intensity = self.frag_chem_intensity[chem]
-
-                    # compute the current fragmented intensity for this chem
-                    new_intensity = np.log(np.sum(frag_event.parents_intensity))
-                    self.frag_chem_intensity[chem] = new_intensity
-
-                    intensity_diff = new_intensity - prev_intensity
-                    if intensity_diff > INTENSITY_DIFF_THRESHOLD:
-                        reward = intensity_diff
-                        self.frag_chem_intensity[chem] = new_intensity
-                        reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
-                    else:
-                        reward = REPEATED_FRAG_REWARD
+                    # chem = frag_event.chem
+                    # prev_intensity = self.frag_chem_intensity[chem]
+                    #
+                    # # compute the current fragmented intensity for this chem
+                    # new_intensity = np.log(np.sum(frag_event.parents_intensity))
+                    # self.frag_chem_intensity[chem] = new_intensity
+                    #
+                    # intensity_diff = new_intensity - prev_intensity
+                    # if intensity_diff > INTENSITY_DIFF_THRESHOLD:
+                    #     reward = intensity_diff
+                    #     self.frag_chem_intensity[chem] = new_intensity
+                    #     reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
+                    # else:
+                    #     reward = REPEATED_FRAG_REWARD
 
                     ###############################################################################
                     # 3. difference from last frag reward scheme
                     ###############################################################################
 
-                    # # look up previous fragmented intensity for this chem
-                    # chem = frag_event.chem
-                    # prev_intensity = self.frag_chem_intensity[chem]
-                    # # compute the current fragmented intensity for this chem
-                    # new_intensity = np.log(np.sum(frag_event.parents_intensity))
-                    # # calculate difference between successive fragmentations of the same chem
-                    # intensity_diff = new_intensity - prev_intensity
-                    # reward = intensity_diff
-                    # self.frag_chem_intensity[chem] = new_intensity
-                    # reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
+                    # look up previous fragmented intensity for this chem
+                    chem = frag_event.chem
+                    prev_intensity = self.frag_chem_intensity[chem]
 
+                    # compute the current fragmented intensity for this chem
+                    new_intensity = np.log(np.sum(frag_event.parents_intensity))
+
+                    # calculate difference between successive fragmentations of the same chem
+                    intensity_diff = new_intensity - prev_intensity
+                    reward = intensity_diff
+                    self.frag_chem_intensity[chem] = new_intensity
+                    reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
 
         assert -1.0 <= reward <= 1
         return reward
