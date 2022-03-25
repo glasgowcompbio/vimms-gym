@@ -6,12 +6,15 @@ from collections import defaultdict
 from gym import spaces
 from loguru import logger
 from random import randrange
+
 from vimms.ChemicalSamplers import UniformMZFormulaSampler, UniformRTAndIntensitySampler
 from vimms.Chemicals import ChemicalMixtureCreator
 from vimms.Common import set_log_level_warning
 from vimms.Controller import AgentBasedController
 from vimms.Environment import Environment
 from vimms.MassSpec import IndependentMassSpectrometer
+from vimms.Noise import UniformSpikeNoise
+
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.features import CleanerTopNExclusion, Feature
@@ -361,44 +364,6 @@ class DDAEnv(gym.Env):
             elif dda_action.ms_level == 2:
                 if frag_event is not None:  # something has been fragmented
 
-                    ###############################################################################
-                    # 1. coverage-like reward scheme
-                    ###############################################################################
-
-                    # look up previous fragmented intensity for this chem
-                    # chem = frag_event.chem
-                    # prev_intensity = self.frag_chem_intensity[chem]
-                    # if np.isclose(prev_intensity, 0.0): # never been fragmented before
-                    #     # compute the current fragmented intensity for this chem
-                    #     new_intensity = np.log(np.sum(frag_event.parents_intensity))
-                    #     self.frag_chem_intensity[chem] = new_intensity
-                    #     reward = 1.0
-                    # else:
-                    #     reward = REPEATED_FRAG_REWARD
-
-                    ###############################################################################
-                    # 2. alternative thresholded reward scheme
-                    ###############################################################################
-
-                    # chem = frag_event.chem
-                    # prev_intensity = self.frag_chem_intensity[chem]
-                    #
-                    # # compute the current fragmented intensity for this chem
-                    # new_intensity = np.log(np.sum(frag_event.parents_intensity))
-                    # self.frag_chem_intensity[chem] = new_intensity
-                    #
-                    # intensity_diff = new_intensity - prev_intensity
-                    # if intensity_diff > INTENSITY_DIFF_THRESHOLD:
-                    #     reward = intensity_diff
-                    #     self.frag_chem_intensity[chem] = new_intensity
-                    #     reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
-                    # else:
-                    #     reward = REPEATED_FRAG_REWARD
-
-                    ###############################################################################
-                    # 3. difference from last frag reward scheme
-                    ###############################################################################
-
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
                     prev_intensity = self.frag_chem_intensity[chem]
@@ -467,13 +432,13 @@ class DDAEnv(gym.Env):
         """
         Generates new mass spec
         """
-        # noise_density = noise_params['noise_density']
-        # noise_max_val = noise_params['noise_max_val']
-        # noise_min_mz = noise_params['mz_range'][0]
-        # noise_max_mz = noise_params['mz_range'][1]
-        # spike_noise = UniformSpikeNoise(noise_density, noise_max_val, min_mz=noise_min_mz,
-        #                                 max_mz=noise_max_mz)
-        spike_noise = None
+        noise_density = noise_params['noise_density']
+        noise_max_val = noise_params['noise_max_val']
+        noise_min_mz = noise_params['mz_range'][0]
+        noise_max_mz = noise_params['mz_range'][1]
+        spike_noise = UniformSpikeNoise(noise_density, noise_max_val, min_mz=noise_min_mz,
+                                        max_mz=noise_max_mz)
+        # spike_noise = None
         ionisation_mode = env_params['ionisation_mode']
         mass_spec = IndependentMassSpectrometer(ionisation_mode, chems, None,
                                                 spike_noise=spike_noise)
