@@ -362,20 +362,32 @@ class DDAEnv(gym.Env):
             elif dda_action.ms_level == 2:
                 if frag_event is not None:  # something has been fragmented
 
-                    # look up previous fragmented intensity for this chem
+                    ###############################################################################
+                    # 1. coverage-like reward scheme
+                    ###############################################################################
+
+                    # # look up previous fragmented intensity for this chem
+                    # chem = frag_event.chem
+                    # prev_intensity = self.frag_chem_intensity[chem]
+                    # if np.isclose(prev_intensity, 0.0): # never been fragmented before
+                    #     # compute the current fragmented intensity for this chem
+                    #     new_intensity = np.log(np.sum(frag_event.parents_intensity))
+                    #     self.frag_chem_intensity[chem] = new_intensity
+                    #     reward = 1.0
+                    # else:
+                    #     reward = REPEATED_FRAG_REWARD
+
+                    ###############################################################################
+                    # 2. alternative thresholded reward scheme
+                    ###############################################################################
+
                     chem = frag_event.chem
                     prev_intensity = self.frag_chem_intensity[chem]
 
                     # compute the current fragmented intensity for this chem
                     new_intensity = np.log(np.sum(frag_event.parents_intensity))
+                    self.frag_chem_intensity[chem] = new_intensity
 
-                    # calculate difference between successive fragmentations of the same chem
-                    # intensity_diff = new_intensity - prev_intensity
-                    # reward = intensity_diff
-                    # self.frag_chem_intensity[chem] = new_intensity
-                    # reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
-
-                    # alternative thresholded reward scheme
                     intensity_diff = new_intensity - prev_intensity
                     if intensity_diff > INTENSITY_DIFF_THRESHOLD:
                         reward = intensity_diff
@@ -383,6 +395,21 @@ class DDAEnv(gym.Env):
                         reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
                     else:
                         reward = REPEATED_FRAG_REWARD
+
+                    ###############################################################################
+                    # 3. difference from last frag reward scheme
+                    ###############################################################################
+
+                    # # look up previous fragmented intensity for this chem
+                    # chem = frag_event.chem
+                    # prev_intensity = self.frag_chem_intensity[chem]
+                    # # compute the current fragmented intensity for this chem
+                    # new_intensity = np.log(np.sum(frag_event.parents_intensity))
+                    # # calculate difference between successive fragmentations of the same chem
+                    # intensity_diff = new_intensity - prev_intensity
+                    # reward = intensity_diff
+                    # self.frag_chem_intensity[chem] = new_intensity
+                    # reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
 
 
         assert -1.0 <= reward <= 1
