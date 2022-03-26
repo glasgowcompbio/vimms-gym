@@ -24,9 +24,8 @@ REPEATED_MS1_REWARD = -0.1
 REPEATED_FRAG_REWARD = -0.2
 INVALID_MOVE_REWARD = -1.0
 
-INTENSITY_DIFF_THRESHOLD = 1
+MAX_REPEATED_FRAGS_ALLOWED = 5
 MAX_OBSERVED_LOG_INTENSITY = 25
-
 
 class DDAEnv(gym.Env):
     """
@@ -68,17 +67,17 @@ class DDAEnv(gym.Env):
         Defines observation spaces of m/z, RT and intensity values
         """
         combined_spaces = spaces.Dict({
-            'intensities': spaces.Box(low=0, high=np.inf, shape=(self.max_peaks,)),
+            'intensities': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'ms_level': spaces.Box(low=1, high=2, shape=(1,)),
-            'fragmented': spaces.MultiBinary(self.max_peaks),
-            'excluded': spaces.Box(low=0, high=np.inf, shape=(self.max_peaks,)),
+            'fragmented': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'excluded': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'valid_actions': spaces.MultiBinary(self.in_dim),
-            'fragmented_count': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'unfragmented_count': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'excluded_count': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'unexcluded_count': spaces.Box(low=0, high=self.max_peaks, shape=(1,)),
-            'elapsed_scans_since_start': spaces.Box(low=0, high=np.inf, shape=(1,)),
-            'elapsed_scans_since_last_ms1': spaces.Box(low=0, high=np.inf, shape=(1,)),
+            'fragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
+            'unfragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
+            'excluded_count': spaces.Box(low=0, high=1, shape=(1,)),
+            'unexcluded_count': spaces.Box(low=0, high=1, shape=(1,)),
+            'elapsed_scans_since_start': spaces.Box(low=0, high=1, shape=(1,)),
+            'elapsed_scans_since_last_ms1': spaces.Box(low=0, high=1, shape=(1,)),
         })
         return combined_spaces
 
@@ -86,7 +85,7 @@ class DDAEnv(gym.Env):
         features = {
             'intensities': np.zeros(self.max_peaks, dtype=np.float32),
             'ms_level': np.zeros(1, dtype=np.float32),
-            'fragmented': np.zeros(self.max_peaks),
+            'fragmented': np.zeros(self.max_peaks, dtype=np.float32),
             'excluded': np.zeros(self.max_peaks, dtype=np.float32),
             'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
             'fragmented_count': np.zeros(1, dtype=np.float32),
@@ -157,7 +156,9 @@ class DDAEnv(gym.Env):
             assert idx is not None
 
             # update fragmented count
-            state['fragmented'][idx] += 1
+            new_fragmented = state['fragmented'][idx] + (1/MAX_REPEATED_FRAGS_ALLOWED)
+            new_fragmented = self._clip_value(new_fragmented, 1.0)
+            state['fragmented'][idx] = new_fragmented
 
             # update exclusion for the selected feature
             current_rt = scan_to_process.rt
@@ -209,12 +210,14 @@ class DDAEnv(gym.Env):
         # count non-excluded
         unexcluded_count = np.count_nonzero(state['excluded'] == 0)
 
-        state['fragmented_count'][0] = fragmented_count
-        state['unfragmented_count'][0] = unfragmented_count
-        state['excluded_count'][0] = excluded_count
-        state['unexcluded_count'][0] = unexcluded_count
-        state['elapsed_scans_since_start'][0] = self.elapsed_scans_since_start
-        state['elapsed_scans_since_last_ms1'][0] = self.elapsed_scans_since_last_ms1
+        state['fragmented_count'][0] = self._clip_value(fragmented_count, self.max_peaks)
+        state['unfragmented_count'][0] = self._clip_value(unfragmented_count, self.max_peaks)
+        state['excluded_count'][0] = self._clip_value(excluded_count, self.max_peaks)
+        state['unexcluded_count'][0] = self._clip_value(unexcluded_count, self.max_peaks)
+        state['elapsed_scans_since_start'][0] = self._clip_value(
+            self.elapsed_scans_since_start, 10000)
+        state['elapsed_scans_since_last_ms1'][0] = self._clip_value(
+            self.elapsed_scans_since_last_ms1, 100)
 
     def _initial_values(self):
         """
