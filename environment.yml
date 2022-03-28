@@ -1,6 +1,7 @@
 name: vimms-gym
 channels:
-- conda-forge
+  - conda-forge
+  - defaults
 dependencies:
   - numpy
   - pandas
@@ -13,8 +14,8 @@ dependencies:
   - ipywidgets
   - pytorch
   - gym
-  - stable-baselines3
   - pip
   - pip:
     - vimms
+    - stable-baselines3
     - tensorboard
