@@ -4,8 +4,21 @@ from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, best_p
 
 
 def evaluate(env):
-    res = evaluate_simulated_env(env.vimms_env)
-    return res['coverage_proportion'], res['intensity_proportion']
+    vimms_env = env.vimms_env
+    vimms_env_res = evaluate_simulated_env(vimms_env)
+    count_fragmented = len(vimms_env_res['chemicals_fragmented'])
+    count_ms1 = len(vimms_env.controller.scans[1])
+    count_ms2 = len(vimms_env.controller.scans[2])
+    ms1_ms2_ratio = float(count_ms1) / count_ms2
+    efficiency = float(count_fragmented) / count_ms2
+
+    eval_res = {
+        'coverage_prop': '%.3f' % vimms_env_res['coverage_proportion'],
+        'intensity_prop': '%.3f' % vimms_env_res['intensity_proportion'],
+        'ms1/ms2 ratio': '%.3f' % ms1_ms2_ratio,
+        'efficiency': '%.3f' % efficiency,
+    }
+    return eval_res
 
 
 def evaluate_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=5000, model=None):
