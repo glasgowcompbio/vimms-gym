@@ -28,7 +28,7 @@ def evaluate(env):
 
 
 def run_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=5000, model=None,
-               print_eval=False, mzml_prefix=None):
+               print_eval=False, print_reward=False, mzml_prefix=None):
     if method in ['DQN', 'PPO']:
         assert model is not None
 
@@ -50,11 +50,15 @@ def run_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=5000, mo
             elif method == 'DQN':
                 action, _states = model.predict(observation, deterministic=True)
             elif method == 'PPO':
-                action = best_ppo_policy(observation, model)
+                # action = best_ppo_policy(observation, model)
+                action, _states = model.predict(observation, deterministic=True)
 
             observation, reward, done, info = env.step(action)
-            num_steps += 1
             episode_reward += reward
+            if print_reward and num_steps % 500 == 0:
+                print(num_steps, episode_reward)
+            num_steps += 1
+
             if done:
                 print(f'Episode {i} finished after {num_steps} timesteps with reward {episode_reward}')
                 if mzml_prefix is None:
