@@ -435,16 +435,21 @@ class DDAEnv(gym.Env):
         """
         Generates new mass spec
         """
-        noise_density = noise_params['noise_density']
-        noise_max_val = noise_params['noise_max_val']
-        noise_min_mz = noise_params['mz_range'][0]
-        noise_max_mz = noise_params['mz_range'][1]
-        spike_noise = UniformSpikeNoise(noise_density, noise_max_val, min_mz=noise_min_mz,
-                                        max_mz=noise_max_mz)
-        # spike_noise = None
+
+        # check whether to enable spike noise
+        enable_spike_noise = noise_params['enable_spike_noise']
+        if enable_spike_noise:
+            noise_density = noise_params['noise_density']
+            noise_max_val = noise_params['noise_max_val']
+            noise_min_mz = noise_params['mz_range'][0]
+            noise_max_mz = noise_params['mz_range'][1]
+            spike_noise = UniformSpikeNoise(noise_density, noise_max_val, min_mz=noise_min_mz,
+                                            max_mz=noise_max_mz)
+        else:
+            spike_noise = None
+
         ionisation_mode = env_params['ionisation_mode']
-        mass_spec = IndependentMassSpectrometer(ionisation_mode, chems, None,
-                                                spike_noise=spike_noise)
+        mass_spec = IndependentMassSpectrometer(ionisation_mode, chems, spike_noise=spike_noise)
         return mass_spec
 
     def _reset_controller(self, env_params):
@@ -485,14 +490,20 @@ class DDAEnv(gym.Env):
         else:  # sample chemicals uniformly
             mz_sampler = UniformMZFormulaSampler(min_mz=min_mz, max_mz=max_mz)
 
-        if 'rt_sampler' in chemical_creator_params:
+        if 'ri_sampler' in chemical_creator_params:
             ri_sampler = chemical_creator_params['ri_sampler']
         else:
             ri_sampler = UniformRTAndIntensitySampler(min_rt=min_rt, max_rt=max_rt,
                                                       min_log_intensity=min_log_intensity,
                                                       max_log_intensity=max_log_intensity)
 
-        cm = ChemicalMixtureCreator(mz_sampler, rt_and_intensity_sampler=ri_sampler)
+        if 'cr_sampler' in chemical_creator_params:
+            cr_sampler = chemical_creator_params['cr_sampler']
+        else:
+            cr_sampler = GaussianChromatogramSampler()
+
+        cm = ChemicalMixtureCreator(mz_sampler, rt_and_intensity_sampler=ri_sampler,
+                                    chromatogram_sampler=cr_sampler)
         chems = cm.sample(n_chems, 2, include_adducts_isotopes=False)
         return chems
 

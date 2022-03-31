@@ -4,7 +4,13 @@ from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, best_p
 
 
 def evaluate(env):
-    vimms_env = env.vimms_env
+
+    # env can be either a DDAEnv or a ViMMS' Environment object
+    try:
+        vimms_env = env.vimms_env
+    except AttributeError:
+        vimms_env = env
+
     vimms_env_res = evaluate_simulated_env(vimms_env)
     count_fragmented = len(vimms_env_res['chemicals_fragmented'])
     count_ms1 = len(vimms_env.controller.scans[1])
@@ -21,7 +27,8 @@ def evaluate(env):
     return eval_res
 
 
-def evaluate_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=5000, model=None):
+def run_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=5000, model=None,
+               print_eval=False, mzml_prefix=None):
     if method in ['DQN', 'PPO']:
         assert model is not None
 
@@ -50,7 +57,12 @@ def evaluate_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=500
             episode_reward += reward
             if done:
                 print(f'Episode {i} finished after {num_steps} timesteps with reward {episode_reward}')
-                out_file = '%s_%d.mzML' % (method, i)
+                if mzml_prefix is None:
+                    out_file = '%s_%d.mzML' % (method, i)
+                else:
+                    out_file = '%s_%s_%d.mzML' % (mzml_prefix, method, i)
+
                 env.write_mzML(out_dir, out_file)
-                print(evaluate(env))
+                if print_eval:
+                    print(evaluate(env))
                 break
