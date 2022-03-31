@@ -119,3 +119,4 @@ notebooks/results
 *.mzML
 Pipfile.lock
 notebooks/results*
+results_100_15
