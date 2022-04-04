@@ -1,14 +1,11 @@
+from abc import abstractmethod
+from collections import defaultdict
+
 import gym
 import numpy as np
 import pylab as plt
-from abc import abstractmethod
-from collections import defaultdict
 from gym import spaces
 from loguru import logger
-from random import randrange
-
-from vimms.ChemicalSamplers import UniformMZFormulaSampler, UniformRTAndIntensitySampler
-from vimms.Chemicals import ChemicalMixtureCreator
 from vimms.Common import set_log_level_warning
 from vimms.Controller import AgentBasedController
 from vimms.Environment import Environment
@@ -17,15 +14,10 @@ from vimms.Noise import UniformSpikeNoise
 
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
+from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, MAX_REPEATED_FRAGS_ALLOWED, INVALID_MOVE_REWARD, \
+    MS1_REWARD, REPEATED_MS1_REWARD
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
-MS1_REWARD = 0.1
-REPEATED_MS1_REWARD = -0.1
-REPEATED_FRAG_REWARD = -0.2
-INVALID_MOVE_REWARD = -1.0
-
-MAX_REPEATED_FRAGS_ALLOWED = 5
-MAX_OBSERVED_LOG_INTENSITY = 25
 
 class DDAEnv(gym.Env):
     """
@@ -120,8 +112,7 @@ class DDAEnv(gym.Env):
             for i in sorted_indices[0:self.max_peaks]:
                 mz = mzs[i]
                 original_intensity = intensities[i]
-                scaled_intensity = self._clip_value(np.log(original_intensity),
-                                                    MAX_OBSERVED_LOG_INTENSITY)
+                scaled_intensity = clip_value(np.log(original_intensity), MAX_OBSERVED_LOG_INTENSITY)
 
                 # initially nothing has been fragmented
                 fragmented = 0
@@ -156,8 +147,8 @@ class DDAEnv(gym.Env):
             assert idx is not None
 
             # update fragmented count
-            new_fragmented = state['fragmented'][idx] + (1/MAX_REPEATED_FRAGS_ALLOWED)
-            new_fragmented = self._clip_value(new_fragmented, 1.0)
+            new_fragmented = state['fragmented'][idx] + (1 / MAX_REPEATED_FRAGS_ALLOWED)
+            new_fragmented = clip_value(new_fragmented, 1.0)
             state['fragmented'][idx] = new_fragmented
 
             # update exclusion for the selected feature
@@ -193,7 +184,7 @@ class DDAEnv(gym.Env):
             # print(mz, current_rt, last_frag_at)
             excluded = current_rt - last_frag_at
 
-        excluded = self._clip_value(excluded, self.rt_tol)
+        excluded = clip_value(excluded, self.rt_tol)
         return excluded
 
     def _update_counts(self, state):
@@ -210,13 +201,13 @@ class DDAEnv(gym.Env):
         # count non-excluded
         unexcluded_count = np.count_nonzero(state['excluded'] == 0)
 
-        state['fragmented_count'][0] = self._clip_value(fragmented_count, self.max_peaks)
-        state['unfragmented_count'][0] = self._clip_value(unfragmented_count, self.max_peaks)
-        state['excluded_count'][0] = self._clip_value(excluded_count, self.max_peaks)
-        state['unexcluded_count'][0] = self._clip_value(unexcluded_count, self.max_peaks)
-        state['elapsed_scans_since_start'][0] = self._clip_value(
+        state['fragmented_count'][0] = clip_value(fragmented_count, self.max_peaks)
+        state['unfragmented_count'][0] = clip_value(unfragmented_count, self.max_peaks)
+        state['excluded_count'][0] = clip_value(excluded_count, self.max_peaks)
+        state['unexcluded_count'][0] = clip_value(unexcluded_count, self.max_peaks)
+        state['elapsed_scans_since_start'][0] = clip_value(
             self.elapsed_scans_since_start, 10000)
-        state['elapsed_scans_since_last_ms1'][0] = self._clip_value(
+        state['elapsed_scans_since_last_ms1'][0] = clip_value(
             self.elapsed_scans_since_last_ms1, 100)
 
     def _initial_values(self):
@@ -365,7 +356,7 @@ class DDAEnv(gym.Env):
 
             # if ms2, give fragmented chemical intensity as the reward
             elif dda_action.ms_level == 2:
-                if frag_event is not None:  # something has been fragmented
+                if frag_event is not None:  # some chemical has been fragmented
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
@@ -378,20 +369,14 @@ class DDAEnv(gym.Env):
                     intensity_diff = new_intensity - prev_intensity
                     reward = intensity_diff
                     self.frag_chem_intensity[chem] = new_intensity
-                    reward = self._clip_value(reward, MAX_OBSERVED_LOG_INTENSITY)
+                    reward = clip_value(reward, MAX_OBSERVED_LOG_INTENSITY, min_range=-1.0, max_range=1.0)
+
+                else:
+                    # fragmenting a spike noise, or no chem associated with this, so we give no reward
+                    reward = 0
 
         assert -1.0 <= reward <= 1
         return reward
-
-    def _clip_value(self, value, max_value):
-        # clip value to [-1, 1]
-        value = min(value, max_value) if value >= 0 else max(value, -max_value)
-        value = value / max_value
-        if value > 1.0:
-            value = 1.0
-        elif value < -1.0:
-            value = -1.0
-        return value
 
     def reset(self, chems=None):
         """
@@ -468,44 +453,6 @@ class DDAEnv(gym.Env):
         max_rt = env_params['rt_range'][1]
         vimms_env = Environment(mass_spec, controller, min_rt, max_rt, progress_bar=False)
         return vimms_env
-
-    def _get_chemicals(self, chemical_creator_params):
-        """
-        Generates new set of chemicals
-        """
-        min_mz = chemical_creator_params['mz_range'][0]
-        max_mz = chemical_creator_params['mz_range'][1]
-        min_rt = chemical_creator_params['rt_range'][0]
-        max_rt = chemical_creator_params['rt_range'][1]
-        min_log_intensity = np.log(chemical_creator_params['intensity_range'][0])
-        max_log_intensity = np.log(chemical_creator_params['intensity_range'][1])
-        n_chemicals_range = chemical_creator_params['n_chemicals']
-        if n_chemicals_range[0] == n_chemicals_range[1]:
-            n_chems = n_chemicals_range[0]
-        else:
-            n_chems = randrange(n_chemicals_range[0], n_chemicals_range[1])
-
-        if 'mz_sampler' in chemical_creator_params:
-            mz_sampler = chemical_creator_params['mz_sampler']
-        else:  # sample chemicals uniformly
-            mz_sampler = UniformMZFormulaSampler(min_mz=min_mz, max_mz=max_mz)
-
-        if 'ri_sampler' in chemical_creator_params:
-            ri_sampler = chemical_creator_params['ri_sampler']
-        else:
-            ri_sampler = UniformRTAndIntensitySampler(min_rt=min_rt, max_rt=max_rt,
-                                                      min_log_intensity=min_log_intensity,
-                                                      max_log_intensity=max_log_intensity)
-
-        if 'cr_sampler' in chemical_creator_params:
-            cr_sampler = chemical_creator_params['cr_sampler']
-        else:
-            cr_sampler = GaussianChromatogramSampler()
-
-        cm = ChemicalMixtureCreator(mz_sampler, rt_and_intensity_sampler=ri_sampler,
-                                    chromatogram_sampler=cr_sampler)
-        chems = cm.sample(n_chems, 2, include_adducts_isotopes=False)
-        return chems
 
     def _handle_acquisition_open(self):
         """
