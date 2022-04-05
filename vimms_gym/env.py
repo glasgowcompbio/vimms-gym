@@ -373,7 +373,7 @@ class DDAEnv(gym.Env):
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
-                    reward = 0
+                    reward = 0.0
 
         assert -1.0 <= reward <= 1
         return reward
