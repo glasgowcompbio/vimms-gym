@@ -329,7 +329,7 @@ class DDAEnv(gym.Env):
         Give a constant reward for MS1 scan
         Compute MS2 reward by summing the total fragmented precursor intensities.
         """
-        frag_event = next_scan.fragevent
+        frag_events = next_scan.fragevent
         reward = 0
 
         # if not a valid move, give a large negative reward
@@ -356,7 +356,11 @@ class DDAEnv(gym.Env):
 
             # if ms2, give fragmented chemical intensity as the reward
             elif dda_action.ms_level == 2:
-                if frag_event is not None:  # some chemical has been fragmented
+                if frag_events is not None:  # some chemical has been fragmented
+
+                    # TODO: assume only 1 chemical has been fragmented
+                    # works for DDA but not for DIA
+                    frag_event = frag_events[0]
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
