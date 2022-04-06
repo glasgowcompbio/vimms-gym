@@ -32,6 +32,7 @@ def run_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=5000, mo
     if method in ['DQN', 'PPO']:
         assert model is not None
 
+    eval_results = []
     for i in range(len(chem_list)):
         chems = chem_list[i]
         observation = env.reset(chems=chems)
@@ -67,6 +68,9 @@ def run_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=5000, mo
                     out_file = '%s_%s_%d.mzML' % (mzml_prefix, method, i)
 
                 env.write_mzML(out_dir, out_file)
+                eval_res = evaluate(env)
+                eval_results.append(eval_res)
                 if print_eval:
-                    print(evaluate(env))
+                    print(eval_res)
                 break
+    return eval_results

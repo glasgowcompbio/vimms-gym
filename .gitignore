@@ -114,9 +114,9 @@ dmypy.json
 .pyre/
 
 # CLMS-specific ignores
-notebooks/results
 .idea
 *.mzML
 Pipfile.lock
-notebooks/results*
-results_100_15
+notebooks/results
+datasets_*.p
+samplers_*.mzML.p
