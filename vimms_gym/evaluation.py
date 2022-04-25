@@ -12,15 +12,17 @@ def evaluate(env):
         vimms_env = env
 
     vimms_env_res = evaluate_simulated_env(vimms_env)
-    count_fragmented = len(vimms_env_res['chemicals_fragmented'])
+    # print(vimms_env_res.keys())
+    # count_fragmented = len(vimms_env_res['chemicals_fragmented'][0])
     count_ms1 = len(vimms_env.controller.scans[1])
     count_ms2 = len(vimms_env.controller.scans[2])
     ms1_ms2_ratio = float(count_ms1) / count_ms2
-    efficiency = float(count_fragmented) / count_ms2
+    # efficiency = float(count_fragmented) / count_ms2
+    efficiency = 0.0
 
     eval_res = {
-        'coverage_prop': '%.3f' % vimms_env_res['coverage_proportion'],
-        'intensity_prop': '%.3f' % vimms_env_res['intensity_proportion'],
+        'coverage_prop': '%.3f' % vimms_env_res['coverage_proportion'][0],
+        'intensity_prop': '%.3f' % vimms_env_res['intensity_proportion'][0],
         'ms1/ms2 ratio': '%.3f' % ms1_ms2_ratio,
         'efficiency': '%.3f' % efficiency,
     }
