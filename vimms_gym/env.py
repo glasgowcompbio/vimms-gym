@@ -11,11 +11,12 @@ from vimms.Controller import AgentBasedController
 from vimms.Environment import Environment
 from vimms.MassSpec import IndependentMassSpectrometer
 from vimms.Noise import UniformSpikeNoise
+from vimms.Roi import RoiBuilder, SmartRoiParams, RoiBuilderParams
 
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
-from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, MAX_REPEATED_FRAGS_ALLOWED, INVALID_MOVE_REWARD, \
-    MS1_REWARD, REPEATED_MS1_REWARD
+from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, MAX_REPEATED_FRAGS_ALLOWED, \
+    INVALID_MOVE_REWARD, MS1_REWARD, REPEATED_MS1_REWARD, MAX_ROI_LENGTH_SECONDS
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -43,6 +44,11 @@ class DDAEnv(gym.Env):
         self.rt_tol = self.env_params['rt_tol']
         self.isolation_window = self.env_params['isolation_window']
 
+        try:
+            self.roi_params = self.env_params['roi_params']
+        except KeyError:
+            self.roi_params = RoiBuilderParams()
+
         self.mass_spec = None
         self.controller = None
         self.vimms_env = None
@@ -59,11 +65,28 @@ class DDAEnv(gym.Env):
         Defines observation spaces of m/z, RT and intensity values
         """
         combined_spaces = spaces.Dict({
+            # precursor ion features
             'intensities': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'ms_level': spaces.Box(low=1, high=2, shape=(1,)),
             'fragmented': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'excluded': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+
+            # roi features
+            'roi_length': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_elapsed_time_since_last_frag': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_at_last_frag': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_min_intensity_since_last_frag': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_max_intensity_since_last_frag': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+
+            # valid action indicators
             'valid_actions': spaces.MultiBinary(self.in_dim),
+
+            # various other counts
             'fragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
             'unfragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
             'excluded_count': spaces.Box(low=0, high=1, shape=(1,)),
@@ -75,11 +98,23 @@ class DDAEnv(gym.Env):
 
     def _initial_state(self):
         features = {
+            # precursor ion features
             'intensities': np.zeros(self.max_peaks, dtype=np.float32),
             'ms_level': np.zeros(1, dtype=np.float32),
             'fragmented': np.zeros(self.max_peaks, dtype=np.float32),
             'excluded': np.zeros(self.max_peaks, dtype=np.float32),
+
+            # roi features
+            'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_elapsed_time_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_at_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_min_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_max_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+
+            # valid action indicators
             'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
+
+            # various other counts
             'fragmented_count': np.zeros(1, dtype=np.float32),
             'unfragmented_count': np.zeros(1, dtype=np.float32),
             'excluded_count': np.zeros(1, dtype=np.float32),
@@ -105,6 +140,12 @@ class DDAEnv(gym.Env):
 
             # new ms1 scan, so initialise a new state
             mzs, rt, intensities = self._get_mzs_rt_intensities(scan_to_process)
+            self.roi_builder.update_roi(scan_to_process)
+            live_rois = self.roi_builder.live_roi
+
+            # used to quickly match feature to a live ROI
+            # key: last (mz, rt, intensity) of an ROI, value: the ROI object
+            last_datum_to_roi = {roi.get_last_datum(): roi for roi in live_rois}
 
             # get the N most intense features first
             features = []
@@ -112,7 +153,8 @@ class DDAEnv(gym.Env):
             for i in sorted_indices[0:self.max_peaks]:
                 mz = mzs[i]
                 original_intensity = intensities[i]
-                scaled_intensity = clip_value(np.log(original_intensity), MAX_OBSERVED_LOG_INTENSITY)
+                scaled_intensity = clip_value(np.log(original_intensity),
+                                              MAX_OBSERVED_LOG_INTENSITY)
 
                 # initially nothing has been fragmented
                 fragmented = 0
@@ -121,8 +163,19 @@ class DDAEnv(gym.Env):
                 current_rt = scan_to_process.rt
                 excluded = self._get_elapsed_time_since_exclusion(mz, current_rt)
 
+                try:
+                    last_datum = (mz, rt, original_intensity)
+                    roi = last_datum_to_roi[last_datum]
+                except KeyError:
+                    # FIXME: this shouldn't happen??!
+                    roi = None
+
+                    # print('Missing: %f %f %f' % last_datum)
+                    # for roi in self.roi_builder.live_roi:
+                    #     print('%s: %s' % (roi, roi.get_last_datum()))
+
                 feature = Feature(mz, rt, original_intensity, scaled_intensity,
-                                  fragmented, excluded)
+                                  fragmented, excluded, roi)
                 features.append(feature)
             self.features = features
 
@@ -135,6 +188,7 @@ class DDAEnv(gym.Env):
                 state['fragmented'][i] = f.fragmented
                 state['excluded'][i] = f.excluded
                 state['valid_actions'][i] = 1  # fragmentable
+                self._update_roi(f, i, state)  # update ROI information for this feature
 
             state['ms_level'][0] = 1
             self.elapsed_scans_since_last_ms1 = 0
@@ -151,11 +205,17 @@ class DDAEnv(gym.Env):
             new_fragmented = clip_value(new_fragmented, 1.0)
             state['fragmented'][idx] = new_fragmented
 
-            # update exclusion for the selected feature
+            # find the feature that has been fragmented in this MS2 scan
             current_rt = scan_to_process.rt
             try:
                 f = self.features[idx]
+
+                # update exclusion for the selected feature
                 self.exclusion.update(f.mz, f.rt)
+
+                # set the ROI linked to this feature to be fragmented
+                f.roi.fragmented()
+
             except IndexError:  # idx selects a non-existing feature
                 pass
 
@@ -170,6 +230,51 @@ class DDAEnv(gym.Env):
 
         state['valid_actions'][-1] = 1  # ms1 action is always valid
         return state
+
+    def _update_roi(self, feature, i, state):
+        # for each feature, get its associated live ROI
+        # there should always be a live ROI for each feature
+        roi = feature.roi
+
+        # current length of this ROI (in seconds)
+        try:
+            roi_length = clip_value(roi.length_in_seconds, MAX_ROI_LENGTH_SECONDS)
+        except AttributeError: # no ROI object
+            roi_length = 0.0
+
+        try:
+            # time elapsed (in seconds) since last fragmentation of this ROI
+            val = roi.rt_list[-1] - roi.rt_list[roi.fragmented_index]
+            roi_elapsed_time_since_last_frag = clip_value(np.log(val), MAX_ROI_LENGTH_SECONDS)
+        except AttributeError:  # no ROI object, or never been fragmented
+            roi_elapsed_time_since_last_frag = 0.0
+
+        try:
+            # intensity of this ROI at last fragmentation
+            val = roi.intensity_list[roi.fragmented_index]
+            roi_intensity_at_last_frag = clip_value(np.log(val), MAX_OBSERVED_LOG_INTENSITY)
+        except AttributeError:  # no ROI object, or never been fragmented
+            roi_intensity_at_last_frag = 0.0
+
+        try:
+            # minimum intensity of this ROI since last fragmentation
+            val = min(roi.intensity_list[roi.fragmented_index:])
+            roi_min_intensity_since_last_frag = clip_value(np.log(val), MAX_OBSERVED_LOG_INTENSITY)
+        except AttributeError:  # no ROI object, or never been fragmented
+            roi_min_intensity_since_last_frag = 0.0
+
+        try:
+            # maximum intensity of this ROI since last fragmentation
+            val = max(roi.intensity_list[roi.fragmented_index:])
+            roi_max_intensity_since_last_frag = clip_value(np.log(val), MAX_OBSERVED_LOG_INTENSITY)
+        except AttributeError:  # no ROI object, or never been fragmented
+            roi_max_intensity_since_last_frag = 0.0
+
+        state['roi_length'][i] = roi_length
+        state['roi_elapsed_time_since_last_frag'][i] = roi_elapsed_time_since_last_frag
+        state['roi_intensity_at_last_frag'][i] = roi_intensity_at_last_frag
+        state['roi_min_intensity_since_last_frag'][i] = roi_min_intensity_since_last_frag
+        state['roi_max_intensity_since_last_frag'][i] = roi_max_intensity_since_last_frag
 
     def _get_elapsed_time_since_exclusion(self, mz, current_rt):
         """
@@ -231,6 +336,10 @@ class DDAEnv(gym.Env):
         self.elapsed_scans_since_start = 0
         self.elapsed_scans_since_last_ms1 = 0
 
+        # track regions of interest
+        smartroi_params = SmartRoiParams()
+        self.roi_builder = RoiBuilder(self.roi_params, smartroi_params=smartroi_params)
+
         # track excluded ions
         self.exclusion = CleanerTopNExclusion(self.mz_tol, self.rt_tol)
 
@@ -243,7 +352,7 @@ class DDAEnv(gym.Env):
     def step(self, action):
         """
         Execute one time step within the environment
-        One step = a block of MS2 scans + 1 MS1 scan
+        One step = perform either an MS1 or an MS2 scan
         """
         self.step_no += 1
         info = {}
@@ -373,7 +482,8 @@ class DDAEnv(gym.Env):
                     intensity_diff = new_intensity - prev_intensity
                     reward = intensity_diff
                     self.frag_chem_intensity[chem] = new_intensity
-                    reward = clip_value(reward, MAX_OBSERVED_LOG_INTENSITY, min_range=-1.0, max_range=1.0)
+                    reward = clip_value(reward, MAX_OBSERVED_LOG_INTENSITY, min_range=-1.0,
+                                        max_range=1.0)
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward

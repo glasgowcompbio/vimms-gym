@@ -1,22 +1,24 @@
-import pandas as pd
 import numpy as np
-
+import pandas as pd
 from vimms.Exclusion import TopNExclusion
 
 
 class Feature():
     def __init__(
-        self, mz, rt, original_intensity, scaled_intensity, 
-        fragmented, excluded):
+            self, mz, rt, original_intensity, scaled_intensity,
+            fragmented, excluded, roi):
         self.mz = mz
         self.rt = rt
         self.scaled_intensity = scaled_intensity
         self.original_intensity = original_intensity
         self.fragmented = fragmented
         self.excluded = excluded
+        self.roi = roi
 
     def __repr__(self):
-        return f'mz={self.mz} rt={self.rt} intensity={self.original_intensity} ({self.scaled_intensity})'
+        return f'mz={self.mz} rt={self.rt} ' \
+               f'intensity={self.original_intensity} ({self.scaled_intensity}) ' \
+               f'roi={self.roi}'
 
 
 class CleanerTopNExclusion(TopNExclusion):

@@ -7,6 +7,7 @@ INVALID_MOVE_REWARD = -1.0
 
 MAX_REPEATED_FRAGS_ALLOWED = 5
 MAX_OBSERVED_LOG_INTENSITY = np.log(1E20)
+MAX_ROI_LENGTH_SECONDS = 100
 
 
 def clip_value(value, max_value, min_range=0.0, max_range=1.0):
