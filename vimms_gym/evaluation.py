@@ -1,10 +1,10 @@
+import numpy as np
 from vimms.Evaluation import evaluate_simulated_env
 
 from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, best_ppo_policy
 
 
 def evaluate(env):
-
     # env can be either a DDAEnv or a ViMMS' Environment object
     try:
         vimms_env = env.vimms_env
@@ -12,13 +12,11 @@ def evaluate(env):
         vimms_env = env
 
     vimms_env_res = evaluate_simulated_env(vimms_env)
-    # print(vimms_env_res.keys())
-    # count_fragmented = len(vimms_env_res['chemicals_fragmented'][0])
+    count_fragmented = np.count_nonzero(vimms_env_res['times_fragmented'])
     count_ms1 = len(vimms_env.controller.scans[1])
     count_ms2 = len(vimms_env.controller.scans[2])
     ms1_ms2_ratio = float(count_ms1) / count_ms2
-    # efficiency = float(count_fragmented) / count_ms2
-    efficiency = 0.0
+    efficiency = float(count_fragmented) / count_ms2
 
     eval_res = {
         'coverage_prop': '%.3f' % vimms_env_res['coverage_proportion'][0],
@@ -63,7 +61,8 @@ def run_method(env, chem_list, method, out_dir, N=10, min_ms1_intensity=5000, mo
             num_steps += 1
 
             if done:
-                print(f'Episode {i} finished after {num_steps} timesteps with reward {episode_reward}')
+                print(
+                    f'Episode {i} finished after {num_steps} timesteps with reward {episode_reward}')
                 if mzml_prefix is None:
                     out_file = '%s_%d.mzML' % (method, i)
                 else:
