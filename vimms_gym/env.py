@@ -214,7 +214,8 @@ class DDAEnv(gym.Env):
                 self.exclusion.update(f.mz, f.rt)
 
                 # set the ROI linked to this feature to be fragmented
-                f.roi.fragmented()
+                if f.roi is not None: # FIXME: it shouldn't happen?
+                    f.roi.fragmented()
 
             except IndexError:  # idx selects a non-existing feature
                 pass
