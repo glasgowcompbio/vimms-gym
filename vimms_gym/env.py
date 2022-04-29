@@ -478,9 +478,10 @@ class DDAEnv(gym.Env):
 
                     reward = 0.0
                     if chem not in self.frag_chem_intensity:
-                        frag_intensity = np.log(np.sum(frag_event.parents_intensity))
+                        frag_intensity = frag_event.parents_intensity[0]
                         self.frag_chem_intensity[chem] = frag_intensity
-                        reward = 1.0
+                        reward = clip_value(frag_intensity, chem.max_intensity,
+                                            min_range=0.0, max_range=1.0)
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
