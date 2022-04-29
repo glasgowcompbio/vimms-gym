@@ -2,7 +2,7 @@ import numpy as np
 from vimms.Evaluation import evaluate_simulated_env, EvaluationData
 
 from vimms_gym.common import METHOD_RANDOM, METHOD_FULLSCAN, METHOD_TOPN, METHOD_PPO, METHOD_DQN
-from vimms_gym.env import DDAEnv, CoverageEnv
+from vimms_gym.env import DDAEnv
 from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, get_ppo_action_probs
 
 
@@ -24,23 +24,24 @@ class EpisodicResults():
         self.infos.append(info)
         self.num_steps += 1
 
-    def add_environment(self, env):
+    def evaluate_environment(self, env, intensity_threshold):
         vimms_env = env.vimms_env
         self.eval_data = EvaluationData(vimms_env)
-        self.eval_res = evaluate(vimms_env)
+        self.eval_res = evaluate(vimms_env, intensity_threshold)
         return self.eval_res
 
     def get_episode_rewards(self):
         return np.sum(self.rewards)
 
 
-def evaluate(env):
+def evaluate(env, intensity_threshold):
     # env can be either a DDAEnv or a ViMMS' Environment object
     try:
         vimms_env = env.vimms_env
     except AttributeError:
         vimms_env = env
 
+    # call vimms codes to compute various statistics
     vimms_env_res = evaluate_simulated_env(vimms_env)
     count_fragmented = np.count_nonzero(vimms_env_res['times_fragmented'])
     count_ms1 = len(vimms_env.controller.scans[1])
@@ -48,18 +49,69 @@ def evaluate(env):
     ms1_ms2_ratio = float(count_ms1) / count_ms2
     efficiency = float(count_fragmented) / count_ms2
 
+    # get all base chemicals used as input to the mass spec
+    all_chems = set(
+        chem.get_original_parent() for chem in vimms_env.mass_spec.chemicals
+    )
+
+    # assume all base chemicals are unfragmented
+    fragmented_intensities = {chem: 0.0 for chem in all_chems}
+
+    # loop through ms2 scans, getting frag_events
+    for ms2_scan in vimms_env.controller.scans[2]:
+        frag_events = ms2_scan.fragevent
+        if frag_events is not None:  # if a chemical has been fragmented ...
+
+            # get the frag event for this scan
+            # TODO: assume only 1 chemical has been fragmented
+            # works for DDA but not for DIA
+            event = frag_events[0]
+
+            # get the base chemical that was fragmented
+            base_chem = event.chem.get_original_parent()
+
+            # store the max intensity of fragmentation for this base chem
+            parent_intensity = event.parents_intensity[0]
+            fragmented_intensities[base_chem] = max(
+                parent_intensity, fragmented_intensities[base_chem])
+
+    TP = 0  # chemicals hit correctly (above threshold)
+    FP = 0  # chemicals hit incorrectly (below threshold)
+    FN = 0  # chemicals not hit
+    for chem in fragmented_intensities:
+        frag_int = fragmented_intensities[chem]
+        if frag_int > 0:  # chemical was fragmented ...
+            if fragmented_intensities[chem] > (intensity_threshold * chem.max_intensity):
+                TP += 1  # above threshold
+            else:
+                FP += 1  # below threshold
+        else:
+            FN += 1  # chemical was not fragmented
+
+    # compute precision, recall, f1
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    f1 = 2 * (recall * precision) / (recall + precision)
+
     eval_res = {
         'coverage_prop': '%.3f' % vimms_env_res['coverage_proportion'][0],
         'intensity_prop': '%.3f' % vimms_env_res['intensity_proportion'][0],
         'ms1/ms2 ratio': '%.3f' % ms1_ms2_ratio,
         'efficiency': '%.3f' % efficiency,
+        'TP': '%d' % TP,
+        'FP': '%d' % FP,
+        'FN': '%d' % FN,
+        'precision': '%.3f' % precision,
+        'recall': '%.3f' % recall,
+        'f1': '%.3f' % f1
     }
     return eval_res
 
 
 def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                N=10, min_ms1_intensity=5000, model=None,
-               print_eval=False, print_reward=False, mzml_prefix=None):
+               print_eval=False, print_reward=False, mzml_prefix=None,
+               intensity_threshold=0.5):
     if method in [METHOD_DQN, METHOD_PPO]:
         assert model is not None
 
@@ -71,11 +123,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
         if print_reward:
             print(f'\nEpisode {i} ({len(chems)} chemicals)')
 
-        if env_name == 'DDAEnv':
-            env = DDAEnv(max_peaks, env_params)
-        elif env_name == 'CoverageEnv':
-            env = CoverageEnv(max_peaks, env_params)
-
+        env = DDAEnv(max_peaks, env_params)
         obs = env.reset(chems=chems)
         done = False
 
@@ -114,7 +162,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
         env.write_mzML(out_dir, out_file)
 
         # environment will be evaluated here
-        eval_res = er.add_environment(env)
+        eval_res = er.evaluate_environment(env, intensity_threshold)
         if print_eval:
             print(eval_res)
         all_episodic_results.append(er)

@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from collections import defaultdict
-from copy import copy, deepcopy
+from copy import deepcopy
 
 import gym
 import numpy as np
@@ -215,7 +215,7 @@ class DDAEnv(gym.Env):
                 self.exclusion.update(f.mz, f.rt)
 
                 # set the ROI linked to this feature to be fragmented
-                if f.roi is not None: # FIXME: it shouldn't happen?
+                if f.roi is not None:  # FIXME: it shouldn't happen?
                     f.roi.fragmented()
 
             except IndexError:  # idx selects a non-existing feature
@@ -241,7 +241,7 @@ class DDAEnv(gym.Env):
         # current length of this ROI (in seconds)
         try:
             roi_length = clip_value(roi.length_in_seconds, MAX_ROI_LENGTH_SECONDS)
-        except AttributeError: # no ROI object
+        except AttributeError:  # no ROI object
             roi_length = 0.0
 
         try:
@@ -475,17 +475,12 @@ class DDAEnv(gym.Env):
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
-                    prev_intensity = self.frag_chem_intensity[chem]
 
-                    # compute the current fragmented intensity for this chem
-                    new_intensity = np.log(np.sum(frag_event.parents_intensity))
-
-                    # calculate difference between successive fragmentations of the same chem
-                    intensity_diff = new_intensity - prev_intensity
-                    reward = intensity_diff
-                    self.frag_chem_intensity[chem] = new_intensity
-                    reward = clip_value(reward, MAX_OBSERVED_LOG_INTENSITY, min_range=-1.0,
-                                        max_range=1.0)
+                    reward = 0.0
+                    if chem not in self.frag_chem_intensity:
+                        frag_intensity = np.log(np.sum(frag_event.parents_intensity))
+                        self.frag_chem_intensity[chem] = frag_intensity
+                        reward = 1.0
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
@@ -629,61 +624,3 @@ class DDAEnv(gym.Env):
     def write_mzML(self, out_dir, out_file):
         self.vimms_env.write_mzML(out_dir, out_file)
         self.vimms_env.write_eval_data(out_dir, out_file)
-
-
-class CoverageEnv(DDAEnv):
-
-    @abstractmethod
-    def _compute_reward(self, next_scan, dda_action, is_valid):
-        """
-        Give a constant reward for MS1 scan
-        Compute MS2 reward by summing the total fragmented precursor intensities.
-        """
-        frag_events = next_scan.fragevent
-        reward = 0
-
-        # if not a valid move, give a large negative reward
-        if not is_valid:
-            reward = INVALID_MOVE_REWARD
-        else:
-
-            # if ms1, give constant positive reward
-            # if invalid move, give constant negative reward
-            if dda_action.ms_level == 1:
-
-                # if ms2 and schedule ms1 ...
-                if self.current_scan.ms_level == 2:
-                    # constant reward
-                    reward = MS1_REWARD
-
-                    # give reward proportional to the number of unexcluded precursors in the ms1 scan
-                    # excluded_count = float(self.state['excluded_count'])
-                    # reward = (self.max_peaks - excluded_count) / self.max_peaks
-
-                else:
-                    # repeated scheduling of MS1 is not desirable
-                    reward = REPEATED_MS1_REWARD
-
-            # if ms2, give fragmented chemical intensity as the reward
-            elif dda_action.ms_level == 2:
-                if frag_events is not None:  # some chemical has been fragmented
-
-                    # TODO: assume only 1 chemical has been fragmented
-                    # works for DDA but not for DIA
-                    frag_event = frag_events[0]
-
-                    # look up previous fragmented intensity for this chem
-                    chem = frag_event.chem
-
-                    reward = 0.0
-                    if chem not in self.frag_chem_intensity:
-                        frag_intensity = np.log(np.sum(frag_event.parents_intensity))
-                        self.frag_chem_intensity[chem] = frag_intensity
-                        reward = 1.0
-
-                else:
-                    # fragmenting a spike noise, or no chem associated with this, so we give no reward
-                    reward = 0.0
-
-        assert -1.0 <= reward <= 1
-        return reward
