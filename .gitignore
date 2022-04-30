@@ -123,3 +123,4 @@ samplers_*.mzML.p
 notebooks/simulated_chems/evaluation
 notebooks/simulated_chems/evaluation_2
 notebooks/simulated_chems/evaluation_coverage
+notebooks/simulated_chems/visualisation
