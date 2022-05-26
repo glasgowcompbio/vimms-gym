@@ -89,9 +89,20 @@ def evaluate(env, intensity_threshold):
             FN += 1  # chemical was not fragmented
 
     # compute precision, recall, f1
-    precision = TP / (TP + FP)
-    recall = TP / (TP + FN)
-    f1 = 2 * (recall * precision) / (recall + precision)
+    try:
+        precision = TP / (TP + FP)
+    except ZeroDivisionError:
+        precision = 0.0
+
+    try:
+        recall = TP / (TP + FN)
+    except ZeroDivisionError:
+        precision = 0.0
+
+    try:
+        f1 = 2 * (recall * precision) / (recall + precision)
+    except ZeroDivisionError:
+        f1 = 0.0
 
     eval_res = {
         'coverage_prop': '%.3f' % vimms_env_res['coverage_proportion'][0],
