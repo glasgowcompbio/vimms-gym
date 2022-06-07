@@ -6,7 +6,7 @@ from vimms_gym.env import DDAEnv
 from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, get_ppo_action_probs
 
 
-class EpisodicResults():
+class Episode():
     def __init__(self, initial_obs):
         self.env = None
         self.rewards = []
@@ -24,13 +24,22 @@ class EpisodicResults():
         self.infos.append(info)
         self.num_steps += 1
 
+    def get_step_data(self, i):
+        return {
+            'state': self.observations[i],
+            'reward': self.rewards[i],
+            'action': self.actions[i],
+            'action_prob': self.action_probs[i],
+            'info': self.infos[i]
+        }
+
     def evaluate_environment(self, env, intensity_threshold):
         vimms_env = env.vimms_env
         self.eval_data = EvaluationData(vimms_env)
         self.eval_res = evaluate(vimms_env, intensity_threshold)
         return self.eval_res
 
-    def get_episode_rewards(self):
+    def get_total_rewards(self):
         return np.sum(self.rewards)
 
 
@@ -139,7 +148,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
         done = False
 
         # lists to store episodic results
-        er = EpisodicResults(obs)
+        episode = Episode(obs)
         while not done:  # repeat until episode is done
 
             # select an action depending on the observation and method
@@ -151,10 +160,10 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
             # store new episodic information
             if obs is not None:
-                er.add_step_data(action, action_probs, obs, reward, info)
+                episode.add_step_data(action, action_probs, obs, reward, info)
 
-            if print_reward and er.num_steps % 500 == 0:
-                print('steps\t', er.num_steps, '\ttotal rewards\t', er.get_episode_rewards())
+            if print_reward and episode.num_steps % 500 == 0:
+                print('steps\t', episode.num_steps, '\ttotal rewards\t', episode.get_total_rewards())
 
             # if episode is finished, break
             if done:
@@ -162,8 +171,8 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
         if print_reward:
             print(
-                f'Finished after {er.num_steps} timesteps with '
-                f'total reward {er.get_episode_rewards()}')
+                f'Finished after {episode.num_steps} timesteps with '
+                f'total reward {episode.get_total_rewards()}')
 
         # save mzML and other info useful for evaluation of the ViMMS environment
         if mzml_prefix is None:
@@ -173,10 +182,10 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
         env.write_mzML(out_dir, out_file)
 
         # environment will be evaluated here
-        eval_res = er.evaluate_environment(env, intensity_threshold)
+        eval_res = episode.evaluate_environment(env, intensity_threshold)
         if print_eval:
             print(eval_res)
-        all_episodic_results.append(er)
+        all_episodic_results.append(episode)
 
     return all_episodic_results
 

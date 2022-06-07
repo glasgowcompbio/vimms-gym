@@ -7,6 +7,7 @@ import numpy as np
 import pylab as plt
 from gym import spaces
 from loguru import logger
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from vimms.Common import set_log_level_warning
 from vimms.Controller import AgentBasedController
 from vimms.Environment import Environment
@@ -17,7 +18,8 @@ from vimms.Roi import RoiBuilder, SmartRoiParams, RoiBuilderParams
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, MAX_REPEATED_FRAGS_ALLOWED, \
-    INVALID_MOVE_REWARD, MS1_REWARD, REPEATED_MS1_REWARD, MAX_ROI_LENGTH_SECONDS
+    INVALID_MOVE_REWARD, MS1_REWARD, REPEATED_MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
+    RENDER_RGB_ARRAY, render_scan
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -25,7 +27,7 @@ class DDAEnv(gym.Env):
     """
     Wrapper ViMMS Environment that follows gym interface
     """
-    metadata = {'render.modes': ['human']}
+    metadata = {'render.modes': ['human', 'rgb_array']}
 
     def __init__(self, max_peaks, params):
         super().__init__()
@@ -357,7 +359,10 @@ class DDAEnv(gym.Env):
         One step = perform either an MS1 or an MS2 scan
         """
         self.step_no += 1
-        info = {}
+        info = {
+            'current_scan': self.current_scan,
+            'last_ms1_scan': self.last_ms1_scan
+        }
 
         # get next scan and next state
         next_scan, episode_done, dda_action, is_valid = self._one_step(
@@ -588,39 +593,38 @@ class DDAEnv(gym.Env):
         assert mzs.shape == intensities.shape
         return mzs, rt, intensities
 
-    def render(self, mode='human', close=False):
+    def render(self, mode='human'):
         """
         Render the environment to the screen
         """
-        logger.info('step %d %s reward %f done %s' % (
-            self.step_no, self.current_scan,
-            self.last_reward, self.episode_done))
+        if mode == RENDER_RGB_ARRAY:
+            # return RGB frame suitable for video
+            fig = render_scan(self.current_scan)
 
-        self._plot_scan(self.current_scan)
+            # FIXME: untested code!
+            # https://stackoverflow.com/questions/35355930/matplotlib-figure-to-image-as-a-numpy-array
+            canvas = FigureCanvasAgg(fig)
 
-    def _plot_scan(self, scan):
-        """
-        Plot a scan
-        Args:
-            scan: a [vimms.MassSpec.Scan][] object.
+            # Retrieve a view on the renderer buffer
+            canvas.draw()
+            buf = canvas.buffer_rgba()
 
-        Returns: None
+            # convert to a NumPy array
+            X = np.asarray(buf)
+            plt.close(fig)
+            return X
 
-        """
-        plt.figure()
-        for i in range(scan.num_peaks):
-            x1 = scan.mzs[i]
-            x2 = scan.mzs[i]
-            y1 = 0
-            y2 = np.log(scan.intensities[i])
-            a = [[x1, y1], [x2, y2]]
-            plt.plot(*zip(*a), marker='', color='r', ls='-', lw=1)
-        plt.title('Scan {0} {1}s -- {2} peaks (ms_level {3})'.format(scan.scan_id, scan.rt,
-                                                                     scan.num_peaks,
-                                                                     scan.ms_level))
-        plt.xlabel('m/z')
-        plt.ylabel('log intensity')
-        plt.show()
+        elif mode == RENDER_HUMAN:
+            logger.info('step %d %s reward %f done %s' % (
+                self.step_no, self.current_scan,
+                self.last_reward, self.episode_done))
+
+            fig = render_scan(self.current_scan)
+            plt.show()
+            plt.close(fig)
+
+        else:
+            super(DDAEnv, self).render(mode=mode)  # just raise an exception
 
     def write_mzML(self, out_dir, out_file):
         self.vimms_env.write_mzML(out_dir, out_file)

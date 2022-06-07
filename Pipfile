@@ -18,6 +18,7 @@ gym = "*"
 stable-baselines3 = "*"
 tensorboard = "*"
 vimms = "*"
+streamlit = "*"
 
 [dev-packages]
 twine = "*"
