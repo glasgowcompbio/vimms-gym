@@ -1,4 +1,5 @@
 import numpy as np
+import pylab as plt
 
 MS1_REWARD = 0.1
 REPEATED_MS1_REWARD = -0.1
@@ -15,6 +16,10 @@ METHOD_TOPN = 'topN'
 METHOD_PPO = 'PPO'
 METHOD_DQN = 'DQN'
 
+RENDER_HUMAN = 'human'
+RENDER_RGB_ARRAY = 'rgb_array'
+
+
 def clip_value(value, max_value, min_range=0.0, max_range=1.0):
     '''
     Scale value by max_value, then clip it to [-min_range, max_range]
@@ -26,3 +31,23 @@ def clip_value(value, max_value, min_range=0.0, max_range=1.0):
     elif value > max_range:
         value = max_range
     return value
+
+
+def render_scan(scan):
+    if scan is None:
+        return None
+
+    fig = plt.figure()
+    for i in range(scan.num_peaks):
+        x1 = scan.mzs[i]
+        x2 = scan.mzs[i]
+        y1 = 0
+        y2 = np.log(scan.intensities[i])
+        a = [[x1, y1], [x2, y2]]
+        plt.plot(*zip(*a), marker='', color='r', ls='-', lw=1)
+    plt.title('Scan {0} {1}s -- {2} peaks (ms_level {3})'.format(scan.scan_id, scan.rt,
+                                                                 scan.num_peaks,
+                                                                 scan.ms_level))
+    plt.xlabel('m/z')
+    plt.ylabel('log intensity')
+    return fig
