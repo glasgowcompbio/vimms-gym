@@ -76,6 +76,7 @@ class DDAEnv(gym.Env):
 
             # roi features
             'roi_length': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'roi_elapsed_time_since_last_frag': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'roi_intensities_2': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'roi_intensities_3': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'roi_intensities_4': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
@@ -103,6 +104,7 @@ class DDAEnv(gym.Env):
 
             # roi features
             'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_elapsed_time_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_intensities_2': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_intensities_3': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_intensities_4': np.zeros(self.max_peaks, dtype=np.float32),
@@ -239,6 +241,13 @@ class DDAEnv(gym.Env):
         except AttributeError:  # no ROI object
             roi_length = 0.0
 
+        try:
+            # time elapsed (in seconds) since last fragmentation of this ROI
+            val = roi.rt_list[-1] - roi.rt_list[roi.fragmented_index]
+            roi_elapsed_time_since_last_frag = clip_value(np.log(val), MAX_ROI_LENGTH_SECONDS)
+        except AttributeError:  # no ROI object, or never been fragmented
+            roi_elapsed_time_since_last_frag = 0.0
+
         # last few intensity values of this ROI
         roi_intensities_2 = 0.0
         roi_intensities_3 = 0.0
@@ -262,6 +271,7 @@ class DDAEnv(gym.Env):
                 pass
 
         state['roi_length'][i] = roi_length
+        state['roi_elapsed_time_since_last_frag'][i] = roi_elapsed_time_since_last_frag
         state['roi_intensities_2'][i] = roi_intensities_2
         state['roi_intensities_3'][i] = roi_intensities_3
         state['roi_intensities_4'][i] = roi_intensities_4
