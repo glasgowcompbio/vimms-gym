@@ -19,7 +19,7 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, MAX_REPEATED_FRAGS_ALLOWED, \
     INVALID_MOVE_REWARD, MS1_REWARD, REPEATED_MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
-    RENDER_RGB_ARRAY, render_scan
+    RENDER_RGB_ARRAY, render_scan, REPEATED_FRAG_REWARD
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -405,8 +405,7 @@ class DDAEnv(gym.Env):
                 target_scaled_intensity = 0
 
             # check if an invalid fragmentation action has been selected
-            # if yes, give negative reward (later) and advance the state of simulation by
-            # doing an ms1 scan
+            # if yes, give negative reward (later)
             dda_action = self.controller.agent.target_ms2(target_mz, target_rt,
                                                           target_original_intensity,
                                                           target_scaled_intensity, idx)
@@ -477,12 +476,13 @@ class DDAEnv(gym.Env):
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
 
-                    reward = 0.0
                     if chem not in self.frag_chem_intensity:
                         frag_intensity = frag_event.parents_intensity[0]
                         self.frag_chem_intensity[chem] = frag_intensity
                         reward = clip_value(frag_intensity, chem.max_intensity,
                                             min_range=0.0, max_range=1.0)
+                    else:
+                        reward = REPEATED_FRAG_REWARD
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
@@ -562,8 +562,9 @@ class DDAEnv(gym.Env):
         """
         Generates new ViMMS environment to run controller and mass spec together
         """
+        margin = 50
         min_rt = env_params['rt_range'][0]
-        max_rt = env_params['rt_range'][1]
+        max_rt = env_params['rt_range'][1] + margin
         vimms_env = Environment(mass_spec, controller, min_rt, max_rt, progress_bar=False)
         return vimms_env
 
