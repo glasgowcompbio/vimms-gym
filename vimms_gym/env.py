@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from collections import defaultdict
 from copy import deepcopy
 
 import gym
@@ -17,9 +16,9 @@ from vimms.Roi import RoiBuilder, SmartRoiParams, RoiBuilderParams
 
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
-from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, MAX_REPEATED_FRAGS_ALLOWED, \
-    INVALID_MOVE_REWARD, MS1_REWARD, REPEATED_MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
-    RENDER_RGB_ARRAY, render_scan, REPEATED_FRAG_REWARD
+from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, INVALID_MOVE_REWARD, \
+    MS1_REWARD, REPEATED_MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
+    RENDER_RGB_ARRAY, render_scan
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -220,15 +219,14 @@ class DDAEnv(gym.Env):
             idx = dda_action.idx
             assert idx is not None
 
-            # update fragmented count
-            new_fragmented = state['fragmented'][idx] + (1 / MAX_REPEATED_FRAGS_ALLOWED)
-            new_fragmented = clip_value(new_fragmented, 1.0)
-            state['fragmented'][idx] = new_fragmented
+            # update fragmented flag
+            state['fragmented'][idx] = 1
 
             # find the feature that has been fragmented in this MS2 scan
             current_rt = scan_to_process.rt
             try:
                 f = self.features[idx]
+                f.fragmented = 1
 
                 # update exclusion for the selected feature
                 self.exclusion.update(f.mz, f.rt)
@@ -417,9 +415,6 @@ class DDAEnv(gym.Env):
         # track excluded ions
         self.exclusion = CleanerTopNExclusion(self.mz_tol, self.rt_tol)
 
-        # track fragmented chemicals
-        self.frag_chem_intensity = defaultdict(float)
-
         # needed for SubprocVecEnv
         set_log_level_warning()
 
@@ -466,28 +461,29 @@ class DDAEnv(gym.Env):
         else:
             # 0 .. N-1 is the index of precursor ion to fragment
             idx = action
-            try:
-                f = self.features[idx]
-                target_mz = f.mz
-                target_rt = f.rt
-                target_original_intensity = f.original_intensity
-                target_scaled_intensity = f.scaled_intensity
-            except IndexError:
-                target_mz = 0
-                target_rt = 0
-                target_original_intensity = 0
-                target_scaled_intensity = 0
 
-            # check if an invalid fragmentation action has been selected
-            # if yes, give negative reward (later)
+            # check if targeting a feature that doesn't exist
+            target_mz = 0
+            target_rt = 0
+            target_original_intensity = 0
+            target_scaled_intensity = 0
+            try:
+                # check if targeting a feature that has been fragmented before
+                f = self.features[idx]
+                if f.fragmented:
+                    is_valid = False
+                else:
+                    target_mz = f.mz
+                    target_rt = f.rt
+                    target_original_intensity = f.original_intensity
+                    target_scaled_intensity = f.scaled_intensity
+
+            except IndexError:
+                is_valid = False
+
             dda_action = self.controller.agent.target_ms2(target_mz, target_rt,
                                                           target_original_intensity,
                                                           target_scaled_intensity, idx)
-            if not dda_action.valid:
-                is_valid = False
-
-                # this makes learning much harder!
-                # dda_action = self.controller.agent.target_ms1()
 
         # Ask controller to process the scan based on action
         # Advance mass spec to process the resulting scan, and check if we're done.
@@ -523,21 +519,8 @@ class DDAEnv(gym.Env):
         else:
 
             # if ms1, give constant positive reward
-            # if invalid move, give constant negative reward
             if dda_action.ms_level == 1:
-
-                # if ms2 and schedule ms1 ...
-                if self.current_scan.ms_level == 2:
-                    # constant reward
-                    reward = MS1_REWARD
-
-                    # give reward proportional to the number of unexcluded precursors in the ms1 scan
-                    # excluded_count = float(self.state['excluded_count'])
-                    # reward = (self.max_peaks - excluded_count) / self.max_peaks
-
-                else:
-                    # repeated scheduling of MS1 is not desirable
-                    reward = REPEATED_MS1_REWARD
+                reward = MS1_REWARD
 
             # if ms2, give fragmented chemical intensity as the reward
             elif dda_action.ms_level == 2:
@@ -549,14 +532,9 @@ class DDAEnv(gym.Env):
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
-
-                    if chem not in self.frag_chem_intensity:
-                        frag_intensity = frag_event.parents_intensity[0]
-                        self.frag_chem_intensity[chem] = frag_intensity
-                        reward = clip_value(frag_intensity, chem.max_intensity,
-                                            min_range=0.0, max_range=1.0)
-                    else:
-                        reward = REPEATED_FRAG_REWARD
+                    frag_intensity = frag_event.parents_intensity[0]
+                    reward = clip_value(frag_intensity, chem.max_intensity,
+                                        min_range=0.0, max_range=1.0)
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
