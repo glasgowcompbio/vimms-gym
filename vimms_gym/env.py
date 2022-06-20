@@ -614,7 +614,7 @@ class DDAEnv(gym.Env):
         """
         Generates new ViMMS environment to run controller and mass spec together
         """
-        margin = 50
+        margin = 0
         min_rt = env_params['rt_range'][0]
         max_rt = env_params['rt_range'][1] + margin
         vimms_env = Environment(mass_spec, controller, min_rt, max_rt, progress_bar=False)
