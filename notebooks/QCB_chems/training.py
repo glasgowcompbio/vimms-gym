@@ -49,9 +49,9 @@ if __name__=="__main__":
     noise_density = 0.1
     noise_max_val = 1E3
 
-    mzml_filename = '../notebooks/fullscan_QCB.mzML'
+    mzml_filename = '../fullscan_QCB.mzML'
     samplers = None
-    samplers_pickle = '../notebooks/QCB_chems/samplers_fullscan_QCB.mzML.p'
+    samplers_pickle = 'samplers_fullscan_QCB.mzML.p'
     if exists(samplers_pickle):
         logger.info('Loaded %s' % samplers_pickle)
         samplers = load_obj(samplers_pickle)
@@ -119,7 +119,7 @@ if __name__=="__main__":
         train_dqn = False
 
     single_save_freq = 1E5
-    multi_save_freq = max(single_save_freq // num_env, 1)
+    save_freq = max(single_save_freq // num_env, 1)
 
     def make_env(rank, seed=0):
         def _init():
@@ -134,6 +134,10 @@ if __name__=="__main__":
     check_env(env)
 
     env_name = 'DDAEnv'    
+
+    ####################################################################
+    # Train PPO
+    ####################################################################
 
     # default parameters
     learning_rate = 0.0003
@@ -176,3 +180,50 @@ if __name__=="__main__":
                     ent_coef=ent_coef, gamma=gamma, gae_lambda=gae_lambda, policy_kwargs=policy_kwargs, verbose=2)
         model.learn(total_timesteps=ppo_timesteps, callback=checkpoint_callback, log_interval=1)
         model.save(fname)    
+
+    ####################################################################
+    # Train DQN
+    ####################################################################
+
+    # original parameters
+    learning_rate = 0.0001
+    batch_size = 32
+    gamma = 0.99
+    exploration_fraction = 0.1
+    exploration_initial_eps = 1.0
+    exploration_final_eps = 0.05
+
+    hidden_nodes = 64
+    net_arch = [hidden_nodes, hidden_nodes]
+    policy_kwargs = dict(net_arch=net_arch)
+
+    # # modified parameters
+    # learning_rate = 0.0001
+    # batch_size = 512
+    # gamma = 0.90
+    # exploration_fraction = 0.25
+    # exploration_initial_eps = 1.0
+    # exploration_final_eps = 0.10
+    # hidden_nodes = 512
+
+    # net_arch = [hidden_nodes, hidden_nodes]
+    # policy_kwargs = dict(net_arch=net_arch)
+
+    model_name = 'DQN'
+    fname = '%s/%s_%s.zip' % (in_dir, env_name, model_name)
+    
+    if train_dqn:
+        torch.set_num_threads(dqn_torch_threads)
+        checkpoint_callback = CheckpointCallback(save_freq=save_freq, save_path=in_dir,
+                                                name_prefix='DQN_checkpoint')
+
+        env = DummyVecEnv([make_env(i) for i in range(num_env)])
+        tensorboard_log = './%s/%s_%s_tensorboard' % (in_dir, env_name, model_name)
+
+        model = DQN('MultiInputPolicy', env, 
+                    tensorboard_log=tensorboard_log,
+                    learning_rate=learning_rate, batch_size=batch_size, gamma=gamma,
+                    exploration_fraction=exploration_fraction, exploration_initial_eps=exploration_initial_eps, exploration_final_eps=exploration_final_eps, 
+                    policy_kwargs=policy_kwargs, verbose=2)
+        model.learn(total_timesteps=dqn_timesteps, callback=checkpoint_callback, log_interval=1)
+        model.save(fname)

@@ -54,9 +54,9 @@ if __name__=="__main__":
     noise_density = 0.1
     noise_max_val = 1E3
 
-    mzml_filename = '../notebooks/fullscan_QCB.mzML'
+    mzml_filename = '../fullscan_QCB.mzML'
     samplers = None
-    samplers_pickle = '../notebooks/QCB_chems/samplers_fullscan_QCB.mzML.p'
+    samplers_pickle = 'samplers_fullscan_QCB.mzML.p'
     if exists(samplers_pickle):
         logger.info('Loaded %s' % samplers_pickle)
         samplers = load_obj(samplers_pickle)
