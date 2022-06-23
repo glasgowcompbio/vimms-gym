@@ -59,6 +59,7 @@ if __name__=="__main__":
         'rt_intensity': ri_sampler,
         'chromatogram': cr_sampler
     }
+
     params = {
         'chemical_creator': {
             'mz_range': mz_range,
@@ -95,17 +96,19 @@ if __name__=="__main__":
         dqn_timesteps = 2E6
         train_ppo = True
         train_dqn = False
+        use_subproc = False
     else:
         num_env = 20
-        ppo_torch_threads = 8
-        dqn_torch_threads = 8
+        ppo_torch_threads = 1
+        dqn_torch_threads = 1
         ppo_timesteps = 2E6
         dqn_timesteps = 2E6
         train_ppo = True
         train_dqn = False
+        use_subproc = False
 
     single_save_freq = 1E5
-    multi_save_freq = max(single_save_freq // num_env, 1)
+    save_freq = max(single_save_freq // num_env, 1)
 
     def make_env(rank, seed=0):
         def _init():
@@ -121,29 +124,31 @@ if __name__=="__main__":
 
     env_name = 'DDAEnv'    
 
-    # default parameters
-    learning_rate = 0.0003
-    batch_size = 64
-    n_steps = 2048
-    ent_coef = 0.0
-    gamma = 0.99
-    gae_lambda = 0.95
-    hidden_nodes = 64
+    ####################################################################
+    # Train PPO
+    ####################################################################
 
-    net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
-    policy_kwargs = dict(net_arch=net_arch)
-
-    # # parameter set 1
+    # # default parameters
     # learning_rate = 0.0003
-    # batch_size = 512
+    # batch_size = 64
     # n_steps = 2048
-    # ent_coef = 0.001
-    # gamma = 0.90
-    # gae_lambda = 0.90
-    # hidden_nodes = 512
-
+    # ent_coef = 0.0
+    # gamma = 0.99
+    # gae_lambda = 0.95
+    # hidden_nodes = 64
     # net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
     # policy_kwargs = dict(net_arch=net_arch)
+
+    # parameter set 1
+    learning_rate = 0.0003
+    batch_size = 512
+    n_steps = 2048
+    ent_coef = 0.001
+    gamma = 0.90
+    gae_lambda = 0.90
+    hidden_nodes = 512
+    net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
+    policy_kwargs = dict(net_arch=net_arch)
 
     model_name = 'PPO'
     fname = '%s/%s_%s.zip' % (in_dir, env_name, model_name)
@@ -153,7 +158,11 @@ if __name__=="__main__":
         checkpoint_callback = CheckpointCallback(save_freq=save_freq, save_path=in_dir,
                                                 name_prefix='PPO_checkpoint')
 
-        env = DummyVecEnv([make_env(i) for i in range(num_env)])
+        if not use_subproc:
+            env = DummyVecEnv([make_env(i) for i in range(num_env)])
+        else:
+            env = SubprocVecEnv([make_env(i) for i in range(num_env)])
+
         tensorboard_log = './%s/%s_%s_tensorboard' % (in_dir, env_name, model_name)
 
         model = PPO('MultiInputPolicy', env, 
@@ -162,3 +171,51 @@ if __name__=="__main__":
                     ent_coef=ent_coef, gamma=gamma, gae_lambda=gae_lambda, policy_kwargs=policy_kwargs, verbose=2)
         model.learn(total_timesteps=ppo_timesteps, callback=checkpoint_callback, log_interval=1)
         model.save(fname)    
+
+    ####################################################################
+    # Train DQN
+    ####################################################################
+
+    # # original parameters
+    # learning_rate = 0.0001
+    # batch_size = 32
+    # gamma = 0.99
+    # exploration_fraction = 0.1
+    # exploration_initial_eps = 1.0
+    # exploration_final_eps = 0.05
+    # hidden_nodes = 64
+    # net_arch = [hidden_nodes, hidden_nodes]
+    # policy_kwargs = dict(net_arch=net_arch)
+
+    # modified parameters
+    learning_rate = 0.0001
+    batch_size = 512
+    gamma = 0.90
+    exploration_fraction = 0.25
+    exploration_initial_eps = 1.0
+    exploration_final_eps = 0.10
+    hidden_nodes = 512
+    net_arch = [hidden_nodes, hidden_nodes]
+    policy_kwargs = dict(net_arch=net_arch)
+
+    model_name = 'DQN'
+    fname = '%s/%s_%s.zip' % (in_dir, env_name, model_name)
+    
+    if train_dqn:
+        torch.set_num_threads(dqn_torch_threads)
+        checkpoint_callback = CheckpointCallback(save_freq=save_freq, save_path=in_dir,
+                                                name_prefix='DQN_checkpoint')
+
+        if not use_subproc:
+            env = DummyVecEnv([make_env(i) for i in range(num_env)])
+        else:
+            env = SubprocVecEnv([make_env(i) for i in range(num_env)])
+        tensorboard_log = './%s/%s_%s_tensorboard' % (in_dir, env_name, model_name)
+
+        model = DQN('MultiInputPolicy', env, 
+                    tensorboard_log=tensorboard_log,
+                    learning_rate=learning_rate, batch_size=batch_size, gamma=gamma,
+                    exploration_fraction=exploration_fraction, exploration_initial_eps=exploration_initial_eps, exploration_final_eps=exploration_final_eps, 
+                    policy_kwargs=policy_kwargs, verbose=2)
+        model.learn(total_timesteps=dqn_timesteps, callback=checkpoint_callback, log_interval=1)
+        model.save(fname)
