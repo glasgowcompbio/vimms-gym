@@ -4,10 +4,11 @@ from os.path import exists
 sys.path.append('../..')
 sys.path.append('..')
 
+# the import order is important to use all cpu cores
 import numpy as np
-from loguru import logger
 import torch
 
+from loguru import logger
 from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor

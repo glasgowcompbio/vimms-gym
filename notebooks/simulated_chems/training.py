@@ -5,8 +5,9 @@ import socket
 sys.path.append('../..')
 sys.path.append('..')
 
-import torch
+# the import order is important to use all cpu cores
 import numpy as np
+import torch
 
 from loguru import logger
 from stable_baselines3 import PPO, DQN
