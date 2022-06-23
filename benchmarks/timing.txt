@@ -1,0 +1,33 @@
+PPO_1 run with DummyVecEnv, 20 envs, pytorch threads 50
+
+real    24m49.496s
+user    284m49.831s
+sys     19m12.053s
+
+PPO_2 run with SubprocessVecEnv, 20 envs, pytorch threads 50
+
+real    16m32.700s
+user    242m59.681s
+sys     16m44.406s
+
+PPO_3 run with SubprocessVecEnv, 10 envs, pytorch threads 100
+
+real    9m8.202s
+user    402m15.654s
+sys     27m25.885s
+
+PPO_4 run with DummyVecEnv, 10 envs, pytorch threads 100
+
+real    15m5.668s
+user    370m10.450s
+sys     29m55.570s
+
+PPO_5 run with SubprocessVecEnv, 20 envs, pytorch threads 100
+
+real    16m59.689s
+user    470m27.515s
+sys     33m46.887s
+
+PPO_6 run with SubprocessVecEnv, 100 envs, pytorch threads 1
+
+seems slow
