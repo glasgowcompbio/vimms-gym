@@ -97,21 +97,6 @@ if __name__=="__main__":
     max_peaks = 200
     env_name = 'DDAEnv'
 
-    ##############################################
-    # using DummyVecEnv
-    ##############################################
-
-    # env = DDAEnv(max_peaks, params)
-    # env = Monitor(env)
-    # env = DummyVecEnv([lambda: env])
-
-    # torch_num_threads = 40
-    # torch.set_num_threads(torch_num_threads)
-
-    ##############################################
-    # using subprocess vectorised env
-    ##############################################
-
     def make_env(rank, seed=0):
         def _init():
             env = DDAEnv(max_peaks, params)
@@ -121,11 +106,25 @@ if __name__=="__main__":
         set_random_seed(seed)
         return _init
 
-    ppo_num_env = 20
-    env = SubprocVecEnv([make_env(i) for i in range(ppo_num_env)])
+    ##############################################
+    # using DummyVecEnv
+    ##############################################
 
-    torch_num_threads = 20
+    num_env = 20
+    env = DummyVecEnv([make_env(i) for i in range(num_env)])
+
+    torch_num_threads = 50
     torch.set_num_threads(torch_num_threads)
+
+    ##############################################
+    # using subprocess vectorised env
+    ##############################################
+
+    # num_env = 20
+    # env = SubprocVecEnv([make_env(i) for i in range(num_env)])
+
+    # torch_num_threads = 50
+    # torch.set_num_threads(torch_num_threads)
 
     ##############################################
 
@@ -139,7 +138,7 @@ if __name__=="__main__":
     gamma = 0.90
     gae_lambda = 0.90
     hidden_nodes = 512
-    total_timesteps = 1E4
+    total_timesteps = 1E5
 
     net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
     policy_kwargs = dict(net_arch=net_arch)
