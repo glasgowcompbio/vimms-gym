@@ -108,9 +108,9 @@ if __name__=="__main__":
     in_dir = 'results'
 
     if socket.gethostname() == 'cauchy':
-        num_env = 8
-        ppo_torch_threads = 100
-        dqn_torch_threads = 100
+        num_env = 20
+        ppo_torch_threads = 20
+        dqn_torch_threads = 20
         ppo_timesteps = 2E6
         dqn_timesteps = 2E6
         train_ppo = True

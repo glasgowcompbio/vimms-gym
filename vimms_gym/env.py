@@ -425,9 +425,23 @@ class DDAEnv(gym.Env):
         """
         self.step_no += 1
         info = {
-            'current_scan': self.current_scan,
-            'last_ms1_scan': self.last_ms1_scan
+            'current_scan_id': self.current_scan.scan_id,
+            'current_scan_mzs': self.current_scan.mzs,
+            'current_scan_rt': self.current_scan.rt,
+            'current_scan_intensities': self.current_scan.intensities,
+            'current_scan_ms_level': self.current_scan.ms_level,
+            'last_ms1_scan_id': None,
+            'last_ms1_scan_mzs': None,
+            'last_ms1_scan_rt': None,
+            'last_ms1_scan_intensities': None,
+            'last_ms1_scan_ms_level': None,
         }
+        if self.last_ms1_scan is not None:
+            info['last_ms1_scan_id'] = self.last_ms1_scan.scan_id,
+            info['last_ms1_scan_mzs'] = self.last_ms1_scan.mzs,
+            info['last_ms1_scan_rt'] = self.last_ms1_scan.rt,
+            info['last_ms1_scan_intensities'] = self.last_ms1_scan.intensities,
+            info['last_ms1_scan_ms_level'] = self.last_ms1_scan.ms_level,
 
         # get next scan and next state
         next_scan, episode_done, dda_action, is_valid = self._one_step(
