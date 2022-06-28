@@ -112,7 +112,7 @@ if __name__=="__main__":
         train_dqn = False
         use_subproc = True
     else:
-        num_env = 8
+        num_env = 20
         ppo_torch_threads = 1
         dqn_torch_threads = 1
         ppo_timesteps = 10E6
@@ -121,7 +121,7 @@ if __name__=="__main__":
         train_dqn = False
         use_subproc = True
 
-    single_save_freq = 5E5
+    single_save_freq = 2.5E5
     save_freq = max(single_save_freq // num_env, 1)
 
     def make_env(rank, seed=0):
