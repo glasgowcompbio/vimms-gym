@@ -18,7 +18,7 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, INVALID_MOVE_REWARD, \
     MS1_REWARD, REPEATED_MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
-    RENDER_RGB_ARRAY, render_scan
+    RENDER_RGB_ARRAY, render_scan, REPEATED_FRAG_REWARD
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -546,10 +546,13 @@ class DDAEnv(gym.Env):
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
-                    frag_intensity = frag_event.parents_intensity[0]
-                    reward = clip_value(frag_intensity, chem.max_intensity,
-                                        min_range=0.0, max_range=1.0)
 
+                    reward = 0.0
+                    if chem not in self.frag_chem_intensity:
+                        frag_intensity = frag_event.parents_intensity[0]
+                        self.frag_chem_intensity[chem] = frag_intensity
+                        reward = clip_value(frag_intensity, chem.max_intensity,
+                                            min_range=0.0, max_range=1.0)
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
                     reward = 0.0
