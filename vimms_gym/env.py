@@ -415,6 +415,9 @@ class DDAEnv(gym.Env):
         # track excluded ions
         self.exclusion = CleanerTopNExclusion(self.mz_tol, self.rt_tol)
 
+        # track fragmented chemicals
+        self.frag_chem_intensity = defaultdict(float)
+
         # needed for SubprocVecEnv
         set_log_level_warning()
 
