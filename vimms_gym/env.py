@@ -223,6 +223,9 @@ class DDAEnv(gym.Env):
             # update fragmented flag
             state['fragmented'][idx] = 1
 
+            # it's no longer valid to fragment this peak again
+            state['valid_actions'][idx] = 0
+
             # find the feature that has been fragmented in this MS2 scan
             current_rt = scan_to_process.rt
             try:
