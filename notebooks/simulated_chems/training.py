@@ -2,6 +2,8 @@ import sys
 from os.path import exists
 import socket
 
+from vimms_gym.common import linear_schedule
+
 sys.path.append('../..')
 sys.path.append('..')
 
@@ -94,8 +96,8 @@ if __name__ == "__main__":
         num_env = 20
         ppo_torch_threads = 20
         dqn_torch_threads = 20
-        ppo_timesteps = 100E6
-        dqn_timesteps = 20E6
+        ppo_timesteps = 20E6
+        dqn_timesteps = 5E6
         train_ppo = True
         train_dqn = False
         use_subproc = True
@@ -146,7 +148,7 @@ if __name__ == "__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # parameter set 1
-    learning_rate = 0.0003
+    learning_rate = linear_schedule(0.001)
     batch_size = 512
     n_steps = 2048
     ent_coef = 0.001

@@ -1,5 +1,6 @@
 import numpy as np
 import pylab as plt
+from typing import Callable
 
 MS1_REWARD = 0.1
 REPEATED_MS1_REWARD = -0.1
@@ -51,3 +52,11 @@ def render_scan(scan):
     plt.xlabel('m/z')
     plt.ylabel('log intensity')
     return fig
+
+
+def linear_schedule(initial_value):
+    # https://stable-baselines3.readthedocs.io/en/master/guide/examples.html?highlight=schedule#learning-rate-schedule
+    def func(progress_remaining):
+        return progress_remaining * initial_value
+
+    return func
