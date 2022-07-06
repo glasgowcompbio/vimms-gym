@@ -20,10 +20,14 @@ def random_policy(obs):
     # randomly choose one valid action based on the observation
     # if there are some ions to fragment, we could either fragment one or perform an MS1 scan
     # if nothing to fragment, then perform an MS1 scan
-    valid_actions = obs['valid_actions']
-    nnz = np.nonzero(valid_actions)[0]  # valid_actions are the non-zeros
-    nnz_idx = np.random.choice(len(nnz))
-    action = nnz[nnz_idx]
+
+    # harder random baseline -- only chooses among valid actions
+    # valid_actions = obs['valid_actions']
+    # nnz = np.nonzero(valid_actions)[0]  # valid_actions are the non-zeros
+    # nnz_idx = np.random.choice(len(nnz))
+    # action = nnz[nnz_idx]
+
+    action = np.random.choice(len(obs['valid_actions']))
     return action
 
 
