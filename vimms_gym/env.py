@@ -554,12 +554,25 @@ class DDAEnv(gym.Env):
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
 
-                    reward = 0.0
-                    if chem not in self.frag_chem_intensity:
-                        frag_intensity = frag_event.parents_intensity[0]
-                        self.frag_chem_intensity[chem] = frag_intensity
-                        reward = clip_value(frag_intensity, chem.max_intensity,
-                                            min_range=0.0, max_range=1.0)
+                    # reward = 0.0
+                    # if chem not in self.frag_chem_intensity:
+                    #     frag_intensity = frag_event.parents_intensity[0]
+                    #     self.frag_chem_intensity[chem] = frag_intensity
+                    #     reward = clip_value(frag_intensity, chem.max_intensity,
+                    #                         min_range=0.0, max_range=1.0)
+
+                    prev_intensity = self.frag_chem_intensity[chem]
+
+                    # compute the current fragmented intensity for this chem
+                    new_intensity = np.log(np.sum(frag_event.parents_intensity))
+
+                    # calculate difference between successive fragmentations of the same chem
+                    intensity_diff = new_intensity - prev_intensity
+                    reward = intensity_diff
+                    self.frag_chem_intensity[chem] = new_intensity
+                    reward = clip_value(reward, MAX_OBSERVED_LOG_INTENSITY, min_range=-1.0,
+                                        max_range=1.0)
+                    
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
                     reward = 0.0
