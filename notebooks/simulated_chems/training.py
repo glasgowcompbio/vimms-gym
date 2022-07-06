@@ -147,7 +147,7 @@ if __name__ == "__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # parameter set 1
-    learning_rate = linear_schedule(0.001)
+    learning_rate = linear_schedule(0.003)
     batch_size = 512
     n_steps = 2048
     ent_coef = 0.001
