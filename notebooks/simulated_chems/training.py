@@ -142,12 +142,12 @@ if __name__=="__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # parameter set 1
-    learning_rate = 0.0003
-    batch_size = 512
+    learning_rate = 0.0001
+    batch_size = 256
     n_steps = 2048
-    ent_coef = 0.001
-    gamma = 0.90
-    gae_lambda = 0.90
+    ent_coef = 0.0
+    gamma = 0.99
+    gae_lambda = 0.95
     hidden_nodes = 512
     net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
     policy_kwargs = dict(net_arch=net_arch)
