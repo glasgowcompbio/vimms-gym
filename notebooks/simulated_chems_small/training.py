@@ -29,7 +29,7 @@ from vimms_gym.common import linear_schedule
 
 if __name__ == "__main__":
 
-    n_chemicals = (2000, 5000)
+    n_chemicals = (20, 50)
     mz_range = (70, 1000)
     rt_range = (0, 1440)
     intensity_range = (1E4, 1E20)
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         }
     }
 
-    max_peaks = 200
+    max_peaks = 100
     in_dir = 'results'
 
     if socket.gethostname() == 'cauchy':
@@ -136,27 +136,27 @@ if __name__ == "__main__":
     ####################################################################
 
     # # default parameters
-    # learning_rate = 0.0003
-    # batch_size = 64
-    # n_steps = 2048
-    # ent_coef = 0.0
-    # gamma = 0.99
-    # gae_lambda = 0.95
-    # hidden_nodes = 64
-    # net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
-    # policy_kwargs = dict(net_arch=net_arch)
-
-    # parameter set 1
-    # learning_rate = linear_schedule(0.001)
-    learning_rate = 0.001
-    batch_size = 512
+    learning_rate = 0.0003
+    batch_size = 64
     n_steps = 2048
-    ent_coef = 0.001
-    gamma = 0.90
-    gae_lambda = 0.90
-    hidden_nodes = 512
+    ent_coef = 0.0
+    gamma = 0.99
+    gae_lambda = 0.95
+    hidden_nodes = 64
     net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
     policy_kwargs = dict(net_arch=net_arch)
+
+    # parameter set 1
+    # # learning_rate = linear_schedule(0.001)
+    # learning_rate = 0.001
+    # batch_size = 512
+    # n_steps = 2048
+    # ent_coef = 0.001
+    # gamma = 0.90
+    # gae_lambda = 0.90
+    # hidden_nodes = 512
+    # net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
+    # policy_kwargs = dict(net_arch=net_arch)
 
     model_name = 'PPO'
     fname = '%s/%s_%s.zip' % (in_dir, env_name, model_name)
