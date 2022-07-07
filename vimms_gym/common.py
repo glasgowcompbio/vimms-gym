@@ -54,9 +54,8 @@ def render_scan(scan):
     return fig
 
 
-def linear_schedule(initial_value):
-    # https://stable-baselines3.readthedocs.io/en/master/guide/examples.html?highlight=schedule#learning-rate-schedule
+def linear_schedule(initial_value, min_value=0.0):
     def func(progress_remaining):
-        return progress_remaining * initial_value
+        return max(progress_remaining * initial_value, min_value)
 
     return func

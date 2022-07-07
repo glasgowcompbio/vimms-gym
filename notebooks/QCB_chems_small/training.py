@@ -112,8 +112,8 @@ if __name__ == "__main__":
         num_env = 20
         ppo_torch_threads = 20
         dqn_torch_threads = 20
-        ppo_timesteps = 2E6
-        dqn_timesteps = 2E6
+        ppo_timesteps = 10E6
+        dqn_timesteps = 10E6
         train_ppo = True
         train_dqn = False
         use_subproc = True

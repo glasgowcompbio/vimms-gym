@@ -30,9 +30,9 @@ from vimms_gym.common import linear_schedule
 if __name__ == "__main__":
 
     n_chemicals = (2000, 5000)
-    mz_range = (70, 1000)
-    rt_range = (0, 1440)
-    intensity_range = (1E4, 1E20)
+    mz_range = (100, 600)
+    rt_range = (200, 1000)
+    intensity_range = (1E4, 1E10)
 
     min_mz = mz_range[0]
     max_mz = mz_range[1]
@@ -57,11 +57,6 @@ if __name__ == "__main__":
                                               min_log_intensity=min_log_intensity,
                                               max_log_intensity=max_log_intensity)
     cr_sampler = GaussianChromatogramSampler()
-    samplers = {
-        'mz': mz_sampler,
-        'rt_intensity': ri_sampler,
-        'chromatogram': cr_sampler
-    }
 
     params = {
         'chemical_creator': {
@@ -71,7 +66,7 @@ if __name__ == "__main__":
             'n_chemicals': n_chemicals,
             'mz_sampler': mz_sampler,
             'ri_sampler': ri_sampler,
-            'cr_sampler': GaussianChromatogramSampler(),
+            'cr_sampler': cr_sampler
         },
         'noise': {
             'enable_spike_noise': enable_spike_noise,
@@ -95,8 +90,8 @@ if __name__ == "__main__":
         num_env = 20
         ppo_torch_threads = 20
         dqn_torch_threads = 20
-        ppo_timesteps = 2E6
-        dqn_timesteps = 2E6
+        ppo_timesteps = 10E6
+        dqn_timesteps = 10E6
         train_ppo = True
         train_dqn = False
         use_subproc = True
@@ -147,8 +142,7 @@ if __name__ == "__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # parameter set 1
-    # learning_rate = linear_schedule(0.001)
-    learning_rate = 0.001
+    learning_rate = linear_schedule(0.001, min_value=0.0003)
     batch_size = 512
     n_steps = 2048
     ent_coef = 0.001
