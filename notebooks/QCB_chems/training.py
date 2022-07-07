@@ -107,22 +107,22 @@ if __name__ == "__main__":
         num_env = 20
         ppo_torch_threads = 20
         dqn_torch_threads = 20
-        ppo_timesteps = 100E6
-        dqn_timesteps = 20E6
+        ppo_timesteps = 2E6
+        dqn_timesteps = 2E6
         train_ppo = True
         train_dqn = False
         use_subproc = True
-        single_save_freq = 1E6
+        single_save_freq = 5E5
     else:
         num_env = 20
         ppo_torch_threads = 1
         dqn_torch_threads = 1
-        ppo_timesteps = 4E6
-        dqn_timesteps = 1E6
+        ppo_timesteps = 2E6
+        dqn_timesteps = 2E6
         train_ppo = True
         train_dqn = False
         use_subproc = True
-        single_save_freq = 2.5E5
+        single_save_freq = 5E5
 
     save_freq = max(single_save_freq // num_env, 1)
 
@@ -159,7 +159,8 @@ if __name__ == "__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # parameter set 1
-    learning_rate = 0.0003
+    # learning_rate = linear_schedule(0.001)
+    learning_rate = 0.001
     batch_size = 512
     n_steps = 2048
     ent_coef = 0.001
@@ -192,7 +193,7 @@ if __name__ == "__main__":
         model.learn(total_timesteps=ppo_timesteps, callback=checkpoint_callback, log_interval=1)
         model.save(fname)
 
-        ####################################################################
+    ####################################################################
     # Train DQN
     ####################################################################
 
