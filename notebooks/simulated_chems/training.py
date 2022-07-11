@@ -88,14 +88,14 @@ if __name__ == "__main__":
 
     if socket.gethostname() == 'cauchy':
         num_env = 20
-        ppo_torch_threads = 20
-        dqn_torch_threads = 20
-        ppo_timesteps = 10E6
-        dqn_timesteps = 10E6
+        ppo_torch_threads = 60
+        dqn_torch_threads = 60
+        ppo_timesteps = 20E6
+        dqn_timesteps = 20E6
         train_ppo = True
         train_dqn = False
         use_subproc = True
-        single_save_freq = 5E5
+        single_save_freq = 1E6
     else:
         num_env = 20
         ppo_torch_threads = 1
