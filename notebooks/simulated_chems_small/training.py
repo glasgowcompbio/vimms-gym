@@ -88,10 +88,10 @@ if __name__ == "__main__":
 
     if socket.gethostname() == 'cauchy':
         num_env = 20
-        ppo_torch_threads = 20
-        dqn_torch_threads = 20
-        ppo_timesteps = 4E6
-        dqn_timesteps = 4E6
+        ppo_torch_threads = 40
+        dqn_torch_threads = 40
+        ppo_timesteps = 10E6
+        dqn_timesteps = 10E6
         train_ppo = True
         train_dqn = False
         use_subproc = True
@@ -142,7 +142,8 @@ if __name__ == "__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # parameter set 1
-    learning_rate = linear_schedule(0.001, min_value=0.0003)
+    # learning_rate = linear_schedule(0.001, min_value=0.0001)
+    learning_rate = min_value=0.0001
     batch_size = 512
     n_steps = 2048
     ent_coef = 0.001
