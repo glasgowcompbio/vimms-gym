@@ -10,7 +10,6 @@ class DataDependantAction():
         self.scaled_intensity = None
         self.ms_level = 1
         self.idx = None
-        self.valid = True
 
     def target(self, mz, rt, original_intensity, scaled_intensity, idx):
         self.mz = mz
@@ -19,12 +18,6 @@ class DataDependantAction():
         self.scaled_intensity = scaled_intensity
         self.idx = idx
         self.ms_level = 2
-
-        # check if this ms2 action is valid
-        self.valid = True
-        if np.isclose(mz, 0) and np.isclose(rt, 0) and \
-                np.isclose(original_intensity, 0):
-            self.valid = False
 
 
 class DataDependantAcquisitionAgent(AbstractAgent):

@@ -203,10 +203,11 @@ class DDAEnv(gym.Env):
             idx = dda_action.idx
             assert idx is not None
 
-            # update fragmented count
-            new_fragmented = state['fragmented'][idx] + (1 / MAX_REPEATED_FRAGS_ALLOWED)
-            new_fragmented = clip_value(new_fragmented, 1.0)
-            state['fragmented'][idx] = new_fragmented
+            # update fragmented flag
+            state['fragmented'][idx] = 1
+
+            # it's no longer valid to fragment this peak again
+            state['valid_actions'][idx] = 0
 
             # find the feature that has been fragmented in this MS2 scan
             current_rt = scan_to_process.rt
@@ -395,29 +396,29 @@ class DDAEnv(gym.Env):
         else:
             # 0 .. N-1 is the index of precursor ion to fragment
             idx = action
-            try:
-                f = self.features[idx]
-                target_mz = f.mz
-                target_rt = f.rt
-                target_original_intensity = f.original_intensity
-                target_scaled_intensity = f.scaled_intensity
-            except IndexError:
-                target_mz = 0
-                target_rt = 0
-                target_original_intensity = 0
-                target_scaled_intensity = 0
 
-            # check if an invalid fragmentation action has been selected
-            # if yes, give negative reward (later) and advance the state of simulation by
-            # doing an ms1 scan
+            # check if targeting a feature that doesn't exist
+            target_mz = 0
+            target_rt = 0
+            target_original_intensity = 0
+            target_scaled_intensity = 0
+            try:
+                # check if targeting a feature that has been fragmented before
+                f = self.features[idx]
+                if f.fragmented:
+                    is_valid = False
+                else:
+                    target_mz = f.mz
+                    target_rt = f.rt
+                    target_original_intensity = f.original_intensity
+                    target_scaled_intensity = f.scaled_intensity
+
+            except IndexError:
+                is_valid = False
+
             dda_action = self.controller.agent.target_ms2(target_mz, target_rt,
                                                           target_original_intensity,
                                                           target_scaled_intensity, idx)
-            if not dda_action.valid:
-                is_valid = False
-
-                # this makes learning much harder!
-                # dda_action = self.controller.agent.target_ms1()
 
         # Ask controller to process the scan based on action
         # Advance mass spec to process the resulting scan, and check if we're done.
