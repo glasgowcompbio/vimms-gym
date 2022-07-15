@@ -18,6 +18,7 @@ class Feature():
     def __repr__(self):
         return f'mz={self.mz} rt={self.rt} ' \
                f'intensity={self.original_intensity} ({self.scaled_intensity}) ' \
+               f'fragmented={self.fragmented} ' \
                f'roi={self.roi}'
 
 

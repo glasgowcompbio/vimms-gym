@@ -160,7 +160,7 @@ class DDAEnv(gym.Env):
                                               MAX_OBSERVED_LOG_INTENSITY)
 
                 # initially nothing has been fragmented
-                fragmented = 0
+                fragmented = False
 
                 # update exclusion elapsed time for all features
                 current_rt = scan_to_process.rt
@@ -188,7 +188,7 @@ class DDAEnv(gym.Env):
             for i in range(len(features)):
                 f = features[i]
                 state['intensities'][i] = f.scaled_intensity
-                state['fragmented'][i] = f.fragmented
+                state['fragmented'][i] = 0 if not f.fragmented else 1
                 state['excluded'][i] = f.excluded
                 state['valid_actions'][i] = 1  # fragmentable
                 self._update_roi(f, i, state)  # update ROI information for this feature
@@ -213,6 +213,7 @@ class DDAEnv(gym.Env):
             current_rt = scan_to_process.rt
             try:
                 f = self.features[idx]
+                f.fragmented = True
 
                 # update exclusion for the selected feature
                 self.exclusion.update(f.mz, f.rt)
