@@ -88,14 +88,15 @@ if __name__ == "__main__":
 
     if socket.gethostname() == 'cauchy':
         num_env = 20
-        ppo_torch_threads = 60
-        dqn_torch_threads = 60
-        ppo_timesteps = 20E6
-        dqn_timesteps = 20E6
+        ppo_torch_threads = 40
+        dqn_torch_threads = 40
+        ppo_timesteps = 100E6
+        dqn_timesteps = 100E6
         train_ppo = True
         train_dqn = False
         use_subproc = True
-        single_save_freq = 1E6
+        single_save_freq = 5E6
+        schedule_learning_rate = False
     else:
         num_env = 20
         ppo_torch_threads = 1
@@ -106,6 +107,7 @@ if __name__ == "__main__":
         train_dqn = False
         use_subproc = True
         single_save_freq = 5E5
+        schedule_learning_rate = False
 
     save_freq = max(single_save_freq // num_env, 1)
 
@@ -142,7 +144,10 @@ if __name__ == "__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # parameter set 1
-    learning_rate = linear_schedule(0.001, min_value=0.0003)
+    if schedule_learning_rate:
+        learning_rate = linear_schedule(0.001, min_value=0.0001)
+    else:
+        learning_rate = 0.0001
     batch_size = 512
     n_steps = 2048
     ent_coef = 0.001
@@ -191,7 +196,10 @@ if __name__ == "__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # modified parameters
-    learning_rate = 0.0001
+    if schedule_learning_rate:
+        learning_rate = linear_schedule(0.001, min_value=0.0001)
+    else:
+        learning_rate = 0.0001
     batch_size = 512
     gamma = 0.90
     exploration_fraction = 0.25

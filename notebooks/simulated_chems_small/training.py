@@ -90,12 +90,13 @@ if __name__ == "__main__":
         num_env = 20
         ppo_torch_threads = 40
         dqn_torch_threads = 40
-        ppo_timesteps = 10E6
-        dqn_timesteps = 10E6
+        ppo_timesteps = 20E6
+        dqn_timesteps = 20E6
         train_ppo = True
         train_dqn = True
         use_subproc = True
         single_save_freq = 1E6
+        schedule_learning_rate = False
     else:
         num_env = 20
         ppo_torch_threads = 1
@@ -106,6 +107,7 @@ if __name__ == "__main__":
         train_dqn = False
         use_subproc = True
         single_save_freq = 5E5
+        schedule_learning_rate = False
 
     save_freq = max(single_save_freq // num_env, 1)
 
@@ -142,8 +144,10 @@ if __name__ == "__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # parameter set 1
-    # learning_rate = linear_schedule(0.001, min_value=0.0001)
-    learning_rate = min_value=0.0001
+    if schedule_learning_rate:
+        learning_rate = linear_schedule(0.001, min_value=0.0001)
+    else:
+        learning_rate = 0.0001
     batch_size = 512
     n_steps = 2048
     ent_coef = 0.001
@@ -192,12 +196,15 @@ if __name__ == "__main__":
     # policy_kwargs = dict(net_arch=net_arch)
 
     # modified parameters
-    learning_rate = 0.0001
+    if schedule_learning_rate:
+        learning_rate = linear_schedule(0.001, min_value=0.0001)
+    else:
+        learning_rate = 0.0001
     batch_size = 512
-    gamma = 0.99
-    exploration_fraction = 0.1
+    gamma = 0.90
+    exploration_fraction = 0.25
     exploration_initial_eps = 1.0
-    exploration_final_eps = 0.05
+    exploration_final_eps = 0.10
     hidden_nodes = 512
     net_arch = [hidden_nodes, hidden_nodes]
     policy_kwargs = dict(net_arch=net_arch)
