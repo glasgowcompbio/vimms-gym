@@ -93,7 +93,7 @@ if __name__ == "__main__":
         ppo_timesteps = 10E6
         dqn_timesteps = 10E6
         train_ppo = True
-        train_dqn = False
+        train_dqn = True
         use_subproc = True
         single_save_freq = 1E6
     else:
@@ -194,10 +194,10 @@ if __name__ == "__main__":
     # modified parameters
     learning_rate = 0.0001
     batch_size = 512
-    gamma = 0.90
-    exploration_fraction = 0.25
+    gamma = 0.99
+    exploration_fraction = 0.1
     exploration_initial_eps = 1.0
-    exploration_final_eps = 0.10
+    exploration_final_eps = 0.05
     hidden_nodes = 512
     net_arch = [hidden_nodes, hidden_nodes]
     policy_kwargs = dict(net_arch=net_arch)
