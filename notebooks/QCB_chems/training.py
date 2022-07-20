@@ -2,8 +2,6 @@ import sys
 from os.path import exists
 import socket
 
-from vimms_gym.common import linear_schedule
-
 sys.path.append('../..')
 sys.path.append('..')
 
@@ -27,6 +25,7 @@ from vimms.ChemicalSamplers import MZMLFormulaSampler, MZMLRTandIntensitySampler
 from vimms.Roi import RoiBuilderParams
 
 from vimms_gym.env import DDAEnv
+from vimms_gym.common import linear_schedule
 
 if __name__ == "__main__":
 
