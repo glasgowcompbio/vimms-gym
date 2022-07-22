@@ -90,13 +90,13 @@ if __name__ == "__main__":
         num_env = 20
         ppo_torch_threads = 40
         dqn_torch_threads = 40
-        ppo_timesteps = 20E6
-        dqn_timesteps = 20E6
+        ppo_timesteps = 2E6
+        dqn_timesteps = 2E6
         train_ppo = True
         train_dqn = True
         use_subproc = True
-        single_save_freq = 1E6
-        schedule_learning_rate = False
+        single_save_freq = 100E6
+        schedule_learning_rate = True
     else:
         num_env = 20
         ppo_torch_threads = 1
@@ -104,10 +104,10 @@ if __name__ == "__main__":
         ppo_timesteps = 2E6
         dqn_timesteps = 2E6
         train_ppo = True
-        train_dqn = False
+        train_dqn = True
         use_subproc = True
-        single_save_freq = 5E5
-        schedule_learning_rate = False
+        single_save_freq = 100E6
+        schedule_learning_rate = True
 
     save_freq = max(single_save_freq // num_env, 1)
 
@@ -145,7 +145,7 @@ if __name__ == "__main__":
 
     # parameter set 1
     if schedule_learning_rate:
-        learning_rate = linear_schedule(0.001, min_value=0.0001)
+        learning_rate = linear_schedule(0.0003, min_value=0.0001)
     else:
         learning_rate = 0.0001
     batch_size = 512
@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
     # modified parameters
     if schedule_learning_rate:
-        learning_rate = linear_schedule(0.001, min_value=0.0001)
+        learning_rate = linear_schedule(0.0003, min_value=0.0001)
     else:
         learning_rate = 0.0001
     batch_size = 512
