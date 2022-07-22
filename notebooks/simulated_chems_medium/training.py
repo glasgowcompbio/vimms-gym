@@ -32,7 +32,7 @@ if __name__ == "__main__":
     n_chemicals = (200, 500)
     mz_range = (100, 600)
     rt_range = (400, 800)
-    intensity_range = (1E4, 1E10)
+    intensity_range = (1E4, 1E20)
 
     min_mz = mz_range[0]
     max_mz = mz_range[1]

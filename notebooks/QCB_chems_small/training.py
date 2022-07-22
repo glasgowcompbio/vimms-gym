@@ -34,11 +34,6 @@ if __name__ == "__main__":
     rt_range = (400, 500)
     intensity_range = (1E4, 1E20)
 
-    # n_chemicals = (2000, 5000)
-    # mz_range = (70, 1000)
-    # rt_range = (0, 1440)
-    # intensity_range = (1E4, 1E20)
-
     min_mz = mz_range[0]
     max_mz = mz_range[1]
     min_rt = rt_range[0]
