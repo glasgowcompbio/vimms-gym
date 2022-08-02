@@ -50,6 +50,6 @@ vimms-gym if desired.
 
 ## Examples
 
-Example notebooks can be found [here](https://github.com/joewandy/vimms-gym/tree/main/notebooks).
+Example notebooks can be found [here](https://github.com/glasgowcompbio/vimms-gym/tree/main/notebooks).
 This includes a demonstration of the environment, as well as other notebooks to train models and
 evaluate the results.
