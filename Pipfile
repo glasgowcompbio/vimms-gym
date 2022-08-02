@@ -19,6 +19,9 @@ stable-baselines3 = "*"
 tensorboard = "*"
 vimms = "*"
 streamlit = "*"
+plotly = "*"
+streamlit_plotly_events = "*"
+streamlit_aggrid = "*"
 
 [dev-packages]
 twine = "*"
