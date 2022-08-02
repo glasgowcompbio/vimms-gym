@@ -1,0 +1,22 @@
+name: vimms-gym
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - loguru
+  - jupyterlab
+  - ipywidgets
+  - pytorch
+  - gym
+  - streamlit
+  - pip
+  - pip:
+    - vimms
+    - stable-baselines3
+    - tensorboard

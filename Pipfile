@@ -1,0 +1,30 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+numpy = "*"
+pandas = "*"
+scipy = "*"
+matplotlib = "*"
+seaborn = "*"
+scikit-learn = "*"
+loguru = "*"
+jupyterlab = "*"
+ipywidgets = "*"
+torch = "*"
+gym = "*"
+stable-baselines3 = "*"
+tensorboard = "*"
+vimms = "*"
+streamlit = "*"
+
+[dev-packages]
+twine = "*"
+build = "*"
+mkdocs = "*"
+mkdocstrings = "*"
+
+[requires]
+python_version = "3"
