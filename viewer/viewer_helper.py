@@ -1,5 +1,6 @@
 import os
 import sys
+
 sys.path.append('..')
 
 import streamlit as st
@@ -10,12 +11,11 @@ from stable_baselines3 import PPO, DQN
 from experiments import preset_qcb_small, preset_qcb_medium, preset_qcb_large
 
 from vimms_gym.common import METHOD_PPO, METHOD_TOPN, METHOD_DQN
-
-
-
-sys.path.append('..')
 from vimms_gym.env import DDAEnv
 from vimms_gym.evaluation import Episode, pick_action
+
+METHOD_DQN_COV = 'DQN (Coverage)'
+METHOD_DQN_INT = 'DQN (Intensity)'
 
 
 def get_parameters(preset_name):
@@ -41,14 +41,20 @@ def load_model_and_params(preset, method, params):
     }
 
     env_name = 'DDAEnv'
-    in_dir = os.path.abspath(os.path.join('..', 'notebooks', preset, 'results'))
 
     if method == METHOD_PPO:
-        fname = os.path.join(in_dir, '%s_%s.zip' % (env_name, method))
-        model = PPO.load(fname, custom_objects=custom_objects)
-    elif method == METHOD_DQN:
-        fname = os.path.join(in_dir, '%s_%s.zip' % (env_name, method))
+        raise ValueError('PPO is no longer supported')
+
+    elif method == METHOD_DQN_COV:
+        in_dir = os.path.abspath(os.path.join('..', 'notebooks', preset, 'results_0.75'))
+        fname = os.path.join(in_dir, '%s_%s.zip' % (env_name, METHOD_DQN))
         model = DQN.load(fname, custom_objects=custom_objects)
+
+    elif method == METHOD_DQN_INT:
+        in_dir = os.path.abspath(os.path.join('..', 'notebooks', preset, 'results_0.25'))
+        fname = os.path.join(in_dir, '%s_%s.zip' % (env_name, METHOD_DQN))
+        model = DQN.load(fname, custom_objects=custom_objects)
+
     elif method == METHOD_TOPN:
         min_ms1_intensity = 5000
         N = 10  # from optimise_baselines.ipynb
@@ -59,6 +65,9 @@ def load_model_and_params(preset, method, params):
 
 
 def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params):
+    if method in [METHOD_DQN_COV, METHOD_DQN_INT]:
+        method = METHOD_DQN
+
     env = DDAEnv(max_peaks, params)
     obs = env.reset(chems=chems)
     done = False
@@ -87,7 +96,7 @@ def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params
                         importance = round(float(max(q_values[0]) - min(q_values[0])), 4)
                 if method == METHOD_TOPN:
                     importance = []
-                episode.add_step_data(action, action_probs, obs, reward, info, importance)
+                episode.add_step_data(action, action_probs, obs, reward, info)
 
             if episode.num_steps % 500 == 0:
                 st.write('Step\t', episode.num_steps, '\tTotal reward\t',
