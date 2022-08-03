@@ -4,7 +4,8 @@ from vimms.Evaluation import evaluate_simulated_env, EvaluationData
 
 from vimms_gym.common import METHOD_RANDOM, METHOD_FULLSCAN, METHOD_TOPN, METHOD_PPO, METHOD_DQN
 from vimms_gym.env import DDAEnv
-from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, get_ppo_action_probs
+from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, get_ppo_action_probs, \
+    get_dqn_q_values
 
 
 class Episode():
@@ -134,7 +135,10 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                N=10, min_ms1_intensity=5000, model=None,
                print_eval=False, print_reward=False, mzml_prefix=None,
                intensity_threshold=0.5):
-    if method in [METHOD_DQN, METHOD_PPO]:
+
+    if METHOD_DQN in method:
+        assert model is not None
+    if METHOD_PPO in method:
         assert model is not None
 
     # to store all results across all loop of chem_list
@@ -177,10 +181,8 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                 f'total reward {episode.get_total_rewards()}')
 
         # save mzML and other info useful for evaluation of the ViMMS environment
-        if mzml_prefix is None:
-            out_file = '%s_%d.mzML' % (method, i)
-        else:
-            out_file = '%s_%s_%d.mzML' % (mzml_prefix, method, i)
+        mzml_name = mzml_prefix if not None else method
+        out_file = '%s_%d.mzML' % (mzml_name, i)
         env.write_mzML(out_dir, out_file)
 
         # environment will be evaluated here
@@ -195,6 +197,11 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 def pick_action(method, obs, model, features, N, min_ms1_intensity):
     action_probs = []
 
+    if METHOD_DQN in method:
+        method = METHOD_DQN
+    elif METHOD_PPO in method:
+        method = METHOD_PPO
+
     if method == METHOD_RANDOM:
         action = random_policy(obs)
     elif method == METHOD_FULLSCAN:
@@ -206,5 +213,7 @@ def pick_action(method, obs, model, features, N, min_ms1_intensity):
         action_probs = get_ppo_action_probs(model, obs)
     elif method == METHOD_DQN:
         action, _states = model.predict(obs, deterministic=True)
+        q_values = get_dqn_q_values(model, obs)
+        action_probs = q_values # not really ....
 
     return action, action_probs
