@@ -1,6 +1,8 @@
 import os
 import sys
 
+import pandas as pd
+
 sys.path.append('..')
 
 import streamlit as st
@@ -16,6 +18,67 @@ from vimms_gym.evaluation import Episode, pick_action
 
 METHOD_DQN_COV = 'DQN (Coverage)'
 METHOD_DQN_INT = 'DQN (Intensity)'
+
+
+class Trajectory():
+    def __init__(self, importance):
+        self.importance = importance
+        self.states = []
+        self.actions = []
+        self.rewards = []
+        self.timesteps = []
+        self.flag = False
+
+    def add_pairs(self, pairs: list):
+        for pair in pairs:
+            self.states.append(pair[0])
+            self.actions.append(pair[1])
+            self.rewards.append(pair[2])
+            self.timesteps.append(pair[3])
+        self.flag = True
+
+    def get_df(self, max_peaks, feature_name):
+        df = pd.DataFrame({'timestep': self.timesteps, 'action': self.actions, 'reward': self.rewards})
+        for name in feature_name:
+            feature_vector = []
+            for i in range(len(self.actions)):
+                if self.actions[i] == max_peaks:
+                    feature_vector.append('None')
+                elif self.actions[i] != max_peaks:
+                    feature_vector.append(self.states[i][name][self.actions[i]])
+            df.insert(loc=3, column=name, value=feature_vector)
+
+        return df
+
+class PriorityQueue():
+    def __init__(self):
+        self.length = 0
+        self.items = []
+        self.I_values = []
+        self.indexes = []
+
+    def insert(self, item, importance, index, budget):
+        self.items.append(item)
+        self.I_values.append(importance)
+        self.indexes.append(index)
+        if self.length < budget:
+            self.length += 1
+
+    def pop(self):
+        del (self.I_values[-1])
+        del (self.items[-1])
+        del (self.indexes[-1])
+
+    def order(self):
+        for i in range(len(self.I_values)):
+            for j in range(len(self.I_values) - 1 - i):
+                if self.I_values[j] < self.I_values[j + 1]:
+                    self.I_values[j], self.I_values[j + 1] = self.I_values[j + 1], self.I_values[j]
+                    self.items[j], self.items[j + 1] = self.items[j + 1], self.items[j]
+                    self.indexes[j], self.indexes[j + 1] = self.indexes[j + 1], self.indexes[j]
+
+    def get_min_I(self):
+        return min(self.I_values)
 
 
 def get_parameters(preset_name):
@@ -64,17 +127,20 @@ def load_model_and_params(preset, method, params):
     return N, min_ms1_intensity, model, params
 
 
-def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params):
+def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params, budget, t_length, statesAfter, intervalSize):
     if method in [METHOD_DQN_COV, METHOD_DQN_INT]:
         method = METHOD_DQN
 
+    T = PriorityQueue()
+    t = []
+    c = 0
+    i = 0
     env = DDAEnv(max_peaks, params)
     obs = env.reset(chems=chems)
     done = False
     episode = Episode(obs)
     with st.spinner('Wait for it...'):
         while not done:  # repeat until episode is done
-
             # select an action depending on the observation and method
             action, action_probs = pick_action(
                 method, obs, model, env.features, N, min_ms1_intensity)
@@ -87,16 +153,30 @@ def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params
 
             # store new episodic information
             if obs is not None:
-                if method == METHOD_PPO:
-                    importance = round(np.max(action_probs) - np.min(action_probs), 4)
+                episode.add_step_data(action, action_probs, obs, reward, info)
                 if method == METHOD_DQN:
+                    if len(t) == t_length:
+                        del (t[0])
+                    t.append([obs, int(action), round(reward, 4), episode.num_steps])
+                    if c > 0:
+                        c -= 1
+
                     with th.no_grad():
                         obs_tensor, _ = model.q_net.obs_to_tensor(obs)
                         q_values = model.q_net(obs_tensor)
                         importance = round(float(max(q_values[0]) - min(q_values[0])), 4)
-                if method == METHOD_TOPN:
-                    importance = []
-                episode.add_step_data(action, action_probs, obs, reward, info)
+                    if intervalSize - c == statesAfter:
+                        T.items[T.indexes.index(i)].add_pairs(t)
+
+                    if T.length < budget or importance > T.get_min_I():
+                        if c == 0:
+                            if T.length == budget:
+                                T.pop()
+                            i += 1
+                            tra = Trajectory(importance)
+                            T.insert(tra, importance, i, budget)
+                            T.order()
+                            c = intervalSize
 
             if episode.num_steps % 500 == 0:
                 st.write('Step\t', episode.num_steps, '\tTotal reward\t',
@@ -107,13 +187,16 @@ def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params
                 msg = f'Episode stored into session: {episode.num_steps} timesteps ' \
                       f'with total reward {episode.get_total_rewards()}'
                 st.success(msg)
+                if method == METHOD_DQN:
+                    if not T.items[T.indexes.index(i)].flag:
+                        T.items[T.indexes.index(i)].add_pairs(t)
 
                 # store scan information
                 vimms_env = env.vimms_env
                 episode.scans = vimms_env.controller.scans
 
                 break
-    return episode, env
+    return episode, env, T
 
 
 def scan_id_to_scan(scans, scan_id):

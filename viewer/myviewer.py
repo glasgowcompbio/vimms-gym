@@ -8,7 +8,7 @@ import sys
 
 sys.path.append('..')
 
-from viewer_helper import run_simulation, load_model_and_params, get_parameters, \
+from viewer_helper import run_simulation, load_model_and_params, get_parameters, METHOD_DQN_COV, METHOD_DQN_INT, \
     scan_id_to_scan
 
 from vimms_gym.common import METHOD_PPO, METHOD_TOPN, METHOD_RANDOM, METHOD_FULLSCAN, render_scan, \
@@ -48,10 +48,10 @@ def main_window():
     if st.sidebar.button('Run episode') and 'chems' in st.session_state and policy not in st.session_state['results']:
         info_container = st.empty()
         with info_container.container():
-            episode, env = train(environment, policy, st.session_state['params'], st.session_state['chems'],
-                                 st.session_state['max_peaks'])
+            episode, env, T = train(environment, policy, st.session_state['params'], st.session_state['chems'],
+                                    st.session_state['max_peaks'])
             # store
-            st.session_state['results'][policy] = [episode, env]
+            st.session_state['results'][policy] = [episode, env, T]
             st.session_state['store'][policy] = {}
         info_container.empty()
     elif 'chems' not in st.session_state:
@@ -96,7 +96,7 @@ def sidebar_policy():
     st.sidebar.subheader("Fragmentation policy")
     policy = st.sidebar.radio(
         "Select a policy",
-        (METHOD_TOPN, METHOD_PPO, METHOD_DQN))
+        (METHOD_TOPN, METHOD_DQN_COV, METHOD_DQN_INT))
 
     # if policy == METHOD_PPO:
     # model_file = st.sidebar.file_uploader('Upload pre-trained PPO model (StableBaselines3)')
@@ -122,11 +122,15 @@ def Generate_chems(environment):
 
 def train(environment, policy, params, chems, max_peaks):  # trainning function
     if params is not None:
+        budget = 5
+        t_length = 40
+        statesAfter = 10
+        intervalSize = 50
         # run simulation to generate an episode
         N, min_ms1_intensity, model, params = load_model_and_params(environment, policy, params)
-        episode, env = run_simulation(N, chems, max_peaks, policy, min_ms1_intensity, model,
-                                      params)
-        return episode, env
+        episode, env, T = run_simulation(N, chems, max_peaks, policy, min_ms1_intensity, model,
+                                         params, budget, t_length, statesAfter, intervalSize)
+        return episode, env, T
     else:
         st.error("parameters error!")
 
@@ -252,7 +256,7 @@ def visual_window():  # interpretation part
             if result == 'topN':
                 st.warning('topN model dose not have this function!!!')
             else:
-                view_trajectory(result, episode, max_peaks)
+                view_trajectory(result, max_peaks)
 
 
 def view_feature(result, feature=None, timestep_range=None, feature_range=None, link=False, link_data=None):
@@ -290,7 +294,6 @@ def view_feature(result, feature=None, timestep_range=None, feature_range=None, 
                 scanid = click_df[click_df.index[0]]
                 e = [event for event in ms2_frags if event.scan_id == scanid]
                 click_dots(e)
-
 
     elif link is True:
         plot_df = st.session_state['store'][result]['feature'].loc[
@@ -398,79 +401,27 @@ def view_chemical(result):
             st.warning('This chemical is not fragmented!!!')
 
 
-def view_trajectory(result, episode, max_peaks):
-    timestep = st.number_input('Input a timestep (from {} to {})'.format(0, episode.num_steps - 1), min_value=0,
-                               max_value=episode.num_steps - 1)
-    t_length = st.number_input('Input the length of trajectory (from {} to {})'.format(10, 40),
-                               min_value=10, max_value=40)
-
-    if timestep < t_length:
-        minimum = t_length - timestep
-        maximum = t_length
-    elif episode.num_steps - 1 - timestep < t_length:
-        minimum = 0
-        maximum = episode.num_steps - 1 - timestep
-    else:
-        minimum = 0
-        maximum = t_length
-    states_after = st.number_input('Input the length after the timestep (from {} to {})'.format(minimum, maximum),
-                                   min_value=minimum, max_value=maximum)
-    if result == METHOD_PPO:
-        min_importance = st.number_input('Input the minimum importance', min_value=0.00, max_value=1.00, value=0.5)
-    if result == METHOD_DQN:
-        min_importance = st.number_input('Input the minimum importance', min_value=1.00, max_value=1.50)
-    if st.button('Extract trajectory'):
-        T1 = []
-        T2 = []
-        feature_name = ['intensities', 'excluded', 'roi_length', 'roi_elapsed_time_since_last_frag',
-                        'roi_intensity_at_last_frag', 'roi_min_intensity_since_last_frag',
-                        'roi_max_intensity_since_last_frag']
-        timestep_before = timestep
-        while len(T1) < t_length - states_after != 0:
-            t = []
-            if timestep_before < 0:
-                break
-            if episode.importances[timestep_before] > min_importance:
-                t.append(timestep_before)
-                t.append(episode.importances[timestep_before])
-                if timestep_before < episode.num_steps - 1 and episode.actions[timestep_before] != max_peaks:
-                    for states_name in feature_name:
-                        t.append(
-                            episode.observations[timestep_before + 1][states_name][episode.actions[timestep_before]])
-                elif timestep_before < episode.num_steps - 1 and episode.actions[timestep_before] == max_peaks:
-                    for states_name in feature_name:
-                        t.append(None)
-                t.append(episode.actions[timestep_before])
-                t.append(episode.rewards[timestep_before])
-
-                T1.append(t)
-
-            timestep_before -= 1
-        T1.reverse()
-        timestep_after = timestep + 1
-        while len(T2) < states_after != 0:
-            t = []
-            if timestep_after > episode.num_steps - 1:
-                break
-            if episode.importances[timestep_after] > min_importance:
-                t.append(timestep_after)
-                t.append(episode.importances[timestep_after])
-                if timestep_after < episode.num_steps - 1 and episode.actions[timestep_after] != max_peaks:
-                    for states_name in feature_name:
-                        t.append(episode.observations[timestep_after + 1][states_name][episode.actions[timestep_after]])
-                elif timestep_after < episode.num_steps - 1 and episode.actions[timestep_after] == max_peaks:
-                    for states_name in feature_name:
-                        t.append(None)
-                t.append(episode.actions[timestep_after])
-                t.append(episode.rewards[timestep_after])
-                T2.append(t)
-
-            timestep_after += 1
-
-        T = T1 + T2
-        T = pd.DataFrame(T)
-        T.columns = ['timestep'] + ['importance'] + feature_name + ['action'] + ['reward']
-        st.write(T)
+def view_trajectory(result, max_peaks):
+    feature_name = ['excluded', 'roi_length', 'roi_elapsed_time_since_last_frag',
+                    'roi_intensity_at_last_frag', 'roi_min_intensity_since_last_frag',
+                    'roi_max_intensity_since_last_frag', 'intensities']
+    T = st.session_state['results'][result][2]
+    t_table = pd.DataFrame({'trajectory': ['trajectory ' + str(i + 1) for i in range(T.length)],
+                            'importance': [I for I in T.I_values]})
+    t_gd = GridOptionsBuilder.from_dataframe(t_table)
+    t_gd.configure_side_bar()
+    t_gd.configure_selection(selection_mode='single', use_checkbox=True)
+    t_grid_table = AgGrid(t_table, enable_enterprise_modules=True, height=175,
+                          gridOptions=t_gd.build(), update_mode=GridUpdateMode.SELECTION_CHANGED,
+                          fit_columns_on_grid_load=True)
+    if t_grid_table["selected_rows"]:
+        selection = int(t_grid_table["selected_rows"][0]['trajectory'].split(' ')[1]) - 1
+        t_df = T.items[selection].get_df(max_peaks, feature_name)
+        trajectory = GridOptionsBuilder.from_dataframe(t_df)
+        trajectory.configure_side_bar()
+        trajectory.configure_selection(selection_mode='single', use_checkbox=True)
+        trajectory_grid_table = AgGrid(t_df, enable_enterprise_modules=True, height=250,
+                                       gridOptions=trajectory.build(), update_mode=GridUpdateMode.SELECTION_CHANGED)
 
 
 main_window()
