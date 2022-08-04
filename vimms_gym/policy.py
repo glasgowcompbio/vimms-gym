@@ -1,4 +1,5 @@
 import numpy as np
+import torch as th
 
 from vimms_gym.features import obs_to_dfs
 
@@ -86,3 +87,10 @@ def get_ppo_best_valid_action(model, observation):
     valid_probs = action_probs * valid_actions  # set invalid actions to have 0s
     best_valid_action = np.argmax(valid_probs)
     return best_valid_action
+
+
+def get_dqn_q_values(model, observation):
+    with th.no_grad():
+        obs_tensor, _ = model.q_net.obs_to_tensor(observation)
+        q_values = model.q_net(obs_tensor)
+        return q_values
