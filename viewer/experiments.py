@@ -4,51 +4,61 @@ from os.path import exists
 import numpy as np
 from loguru import logger
 from vimms.ChemicalSamplers import MZMLFormulaSampler, MZMLRTandIntensitySampler, \
-    GaussianChromatogramSampler
+    GaussianChromatogramSampler, MZMLChromatogramSampler
 from vimms.Common import POSITIVE, load_obj, save_obj
+from vimms.Roi import RoiBuilderParams
 
 
-def preset_qcb_small():
+def preset_qcb_small(extract_chromatograms=False):
     max_peaks = 100
     mzml_filename = os.path.abspath(os.path.join('..', 'notebooks', 'fullscan_QCB.mzML'))
-    samplers_pickle = 'samplers_QCB_small.p'
+    if extract_chromatograms:
+        samplers_pickle = 'samplers_QCB_small_extracted.p'
+    else:
+        samplers_pickle = 'samplers_QCB_small_gaussian.p'
     n_chemicals = (20, 50)
     mz_range = (100, 110)
     rt_range = (400, 500)
     intensity_range = (1E4, 1E20)
     params = generate_params(mzml_filename, samplers_pickle, n_chemicals,
-                             mz_range, rt_range, intensity_range)
+                             mz_range, rt_range, intensity_range, extract_chromatograms)
     return params, max_peaks
 
 
-def preset_qcb_medium():
+def preset_qcb_medium(extract_chromatograms=False):
     max_peaks = 200
     mzml_filename = os.path.abspath(os.path.join('..', 'notebooks', 'fullscan_QCB.mzML'))
-    samplers_pickle = 'samplers_QCB_medium.p'
+    if extract_chromatograms:
+        samplers_pickle = 'samplers_QCB_medium_extracted.p'
+    else:
+        samplers_pickle = 'samplers_QCB_medium_gaussian.p'
     n_chemicals = (200, 500)
     mz_range = (100, 600)
     rt_range = (400, 800)
     intensity_range = (1E4, 1E20)
     params = generate_params(mzml_filename, samplers_pickle, n_chemicals,
-                             mz_range, rt_range, intensity_range)
+                             mz_range, rt_range, intensity_range, extract_chromatograms)
     return params, max_peaks
 
 
-def preset_qcb_large():
+def preset_qcb_large(extract_chromatograms=False):
     max_peaks = 200
     mzml_filename = os.path.abspath(os.path.join('..', 'notebooks', 'fullscan_QCB.mzML'))
-    samplers_pickle = 'samplers_QCB_large.p'
+    if extract_chromatograms:
+        samplers_pickle = 'samplers_QCB_large_extracted.p'
+    else:
+        samplers_pickle = 'samplers_QCB_large_gaussian.p'
     n_chemicals = (2000, 5000)
     mz_range = (70, 1000)
     rt_range = (0, 1440)
     intensity_range = (1E4, 1E20)
     params = generate_params(mzml_filename, samplers_pickle, n_chemicals,
-                             mz_range, rt_range, intensity_range)
+                             mz_range, rt_range, intensity_range, extract_chromatograms)
     return params, max_peaks
 
 
 def generate_params(mzml_filename, samplers_pickle, n_chemicals, mz_range, rt_range,
-                    intensity_range):
+                    intensity_range, extract_chromatograms):
     min_mz = mz_range[0]
     max_mz = mz_range[1]
     min_rt = rt_range[0]
@@ -64,7 +74,7 @@ def generate_params(mzml_filename, samplers_pickle, n_chemicals, mz_range, rt_ra
     noise_max_val = 1E3
     mz_sampler, ri_sampler, cr_sampler = get_samplers(mzml_filename, samplers_pickle, min_mz,
                                                       max_mz, min_rt, max_rt, min_log_intensity,
-                                                      max_log_intensity)
+                                                      max_log_intensity, extract_chromatograms)
     params = {
         'chemical_creator': {
             'mz_range': mz_range,
@@ -93,7 +103,7 @@ def generate_params(mzml_filename, samplers_pickle, n_chemicals, mz_range, rt_ra
 
 
 def get_samplers(mzml_filename, samplers_pickle, min_mz, max_mz, min_rt, max_rt, min_log_intensity,
-                 max_log_intensity):
+                 max_log_intensity, extract_chromatograms):
     if exists(samplers_pickle):
         logger.info('Loaded %s' % samplers_pickle)
         samplers = load_obj(samplers_pickle)
@@ -106,7 +116,11 @@ def get_samplers(mzml_filename, samplers_pickle, min_mz, max_mz, min_rt, max_rt,
         ri_sampler = MZMLRTandIntensitySampler(mzml_filename, min_rt=min_rt, max_rt=max_rt,
                                                min_log_intensity=min_log_intensity,
                                                max_log_intensity=max_log_intensity)
-        cr_sampler = GaussianChromatogramSampler()
+        if extract_chromatograms:
+            roi_params = RoiBuilderParams(min_roi_length=3, at_least_one_point_above=5000)
+            cr_sampler = MZMLChromatogramSampler(mzml_filename, roi_params=roi_params)
+        else:
+            cr_sampler = GaussianChromatogramSampler()
         samplers = {
             'mz': mz_sampler,
             'rt_intensity': ri_sampler,

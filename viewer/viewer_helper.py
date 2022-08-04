@@ -91,6 +91,8 @@ def get_parameters(preset_name):
             return preset_qcb_small()
         elif preset_name == 'QCB_chems_medium':
             return preset_qcb_medium()
+        elif preset_name == 'QCB_resimulated_medium':
+            return preset_qcb_medium(extract_chromatograms=True)
         elif preset_name == 'QCB_chems_large':
             return None, None  # not supported yet
 
@@ -113,20 +115,28 @@ def load_model_and_params(preset, method, params):
         raise ValueError('PPO is no longer supported')
 
     elif method == METHOD_DQN_COV:
-        in_dir = os.path.abspath(os.path.join('..', 'notebooks', preset, 'results_0.75'))
+        alpha = 0.75
+        in_dir = os.path.abspath(os.path.join('..', 'notebooks', preset, 'results_%.2f' % alpha))
         fname = os.path.join(in_dir, '%s_%s.zip' % (env_name, METHOD_DQN))
         model = DQN.load(fname, custom_objects=custom_objects)
+        params['env']['alpha'] = alpha
 
     elif method == METHOD_DQN_INT:
-        in_dir = os.path.abspath(os.path.join('..', 'notebooks', preset, 'results_0.25'))
+        alpha = 0.25
+        in_dir = os.path.abspath(os.path.join('..', 'notebooks', preset, 'results_%.2f' % alpha))
         fname = os.path.join(in_dir, '%s_%s.zip' % (env_name, METHOD_DQN))
         model = DQN.load(fname, custom_objects=custom_objects)
+        params['env']['alpha'] = alpha
 
     elif method == METHOD_TOPN:
         min_ms1_intensity = 5000
         N = 10  # from optimise_baselines.ipynb
         rt_tol = 15  # from optimise_baselines.ipynb
         params['env']['rt_tol'] = rt_tol
+
+        # FIXME: this makes the Top-N reward not comparable to DQN_COV and DQN_INT,
+        #        where 0.25 and 0.75 were used
+        params['env']['alpha'] = 0.50
 
     return N, min_ms1_intensity, model, params
 

@@ -75,16 +75,20 @@ def sidebar_environment():
     if option == "Existing preset environment":
         environment = st.sidebar.radio(
             "Select a preset environment",
-            ('QCB_chems_small', 'QCB_chems_medium', 'QCB_chems_large'))
+            ('QCB_chems_small', 'QCB_chems_medium', 'QCB_resimulated_medium'))
         if environment == "QCB_chems_small":
-            st.sidebar.caption('Generate 20 - 50 chemical objects that resembles the QC Beer sample.')
+            st.sidebar.caption('Generate 20 - 50 chemical objects with m/z, RT and intensities that resembles the QC '
+                               'Beer sample. '
+                               'Chromatographic peak shapes are assumed to be Gaussian.')
         elif environment == "QCB_chems_medium":
             st.sidebar.caption(
-                'Generate 200 - 500 chemical objects that resembles the QC Beer sample.')
-        elif environment == "QCB_chems_large":
+                'Generate 200 - 500 chemical objects with m/z, RT and intensities that resembles the QC Beer sample.'
+                'Chromatographic peak shapes are assumed to be Gaussian.')
+        elif environment == "QCB_resimulated_medium":
             st.sidebar.caption(
-                'Generate 2000 - 5000 chemical objects that resembles the QC Beer sample.')
-            st.warning('This preset is not implemented yet')
+                'Generate 200 - 500 chemical objects with m/z, RT and intensities that resembles the QC Beer sample.'
+                'Chromatographic peak shapes are extracted from experimental data by detecting regions-of-interest '
+                '(ROIs) in the fullscan mzML file.')
     elif option == "Upload file":
         environment = st.sidebar.file_uploader("Upload ViMMS chemicals")
         st.warning('This preset is not implemented yet')
