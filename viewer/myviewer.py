@@ -44,12 +44,13 @@ def main_window():
         st.session_state['link_data'] = []
 
     policy = sidebar_policy()  # sidebar
+    budget, t_length, statesAfter, intervalSize = sidebar_trajectory_params()
     # button
     if st.sidebar.button('Run episode') and 'chems' in st.session_state and policy not in st.session_state['results']:
         info_container = st.empty()
         with info_container.container():
             episode, env, T = train(environment, policy, st.session_state['params'], st.session_state['chems'],
-                                    st.session_state['max_peaks'])
+                                    st.session_state['max_peaks'], budget, t_length, statesAfter, intervalSize)
             # store
             st.session_state['results'][policy] = [episode, env, T]
             st.session_state['store'][policy] = {}
@@ -104,6 +105,16 @@ def sidebar_policy():
     return policy
 
 
+def sidebar_trajectory_params():
+    st.sidebar.subheader('Trajectory parameters')
+    budget = st.sidebar.number_input('Input number of trajectory', value=5)
+    t_length = st.sidebar.number_input('Input the length of each trajectory', value=40)
+    statesAfter = st.sidebar.number_input('Input the length of states after', value=10)
+    intervalSize = st.sidebar.number_input('Input the interval size between trajectories', value=50)
+    st.sidebar.markdown("---")
+    return budget, t_length, statesAfter, intervalSize
+
+
 def Generate_chems(environment):
     params, max_peaks = get_parameters(environment)
     if params is not None:
@@ -120,12 +131,8 @@ def Generate_chems(environment):
         st.error("parameters error!")
 
 
-def train(environment, policy, params, chems, max_peaks):  # trainning function
+def train(environment, policy, params, chems, max_peaks, budget, t_length, statesAfter, intervalSize):  # trainning function
     if params is not None:
-        budget = 5
-        t_length = 40
-        statesAfter = 10
-        intervalSize = 50
         # run simulation to generate an episode
         N, min_ms1_intensity, model, params = load_model_and_params(environment, policy, params)
         episode, env, T = run_simulation(N, chems, max_peaks, policy, min_ms1_intensity, model,
@@ -256,6 +263,7 @@ def visual_window():  # interpretation part
             if result == 'topN':
                 st.warning('topN model dose not have this function!!!')
             else:
+                st.header('View Trajectories')
                 view_trajectory(result, max_peaks)
 
 
@@ -382,7 +390,7 @@ def view_chemical(result):
             for frag in frags:
                 store = st.session_state['store'][result]['feature'][
                     st.session_state['store'][result]['feature']['scan_id'] == frag.scan_id]
-                store.insert(loc=11, column='query_rt', value=round(frag.query_rt, 2))
+                store.insert(loc=0, column='query_rt', value=round(frag.query_rt, 2))
                 frag_df.append(store)
             frag_df = pd.concat(frag_df)
             ms2_gd = GridOptionsBuilder.from_dataframe(frag_df)
@@ -411,17 +419,29 @@ def view_trajectory(result, max_peaks):
     t_gd = GridOptionsBuilder.from_dataframe(t_table)
     t_gd.configure_side_bar()
     t_gd.configure_selection(selection_mode='single', use_checkbox=True)
+    st.subheader('Trajectory Table')
     t_grid_table = AgGrid(t_table, enable_enterprise_modules=True, height=175,
                           gridOptions=t_gd.build(), update_mode=GridUpdateMode.SELECTION_CHANGED,
                           fit_columns_on_grid_load=True)
     if t_grid_table["selected_rows"]:
+        st.subheader('Detail info')
         selection = int(t_grid_table["selected_rows"][0]['trajectory'].split(' ')[1]) - 1
+        ms2_frags = st.session_state['store'][result]['ms2_frags']
         t_df = T.items[selection].get_df(max_peaks, feature_name)
+        # for scanid in t_df['scan_id']:
+        #
+        # chemical = []
+        # for scanid in t_df['scan_id']:
+        #     for e in ms2_frags:
+        #         if e.scan_id == scanid and e.chem not in chemical:
+        #             chemical.append(e.chem)
+
         trajectory = GridOptionsBuilder.from_dataframe(t_df)
         trajectory.configure_side_bar()
         trajectory.configure_selection(selection_mode='single', use_checkbox=True)
         trajectory_grid_table = AgGrid(t_df, enable_enterprise_modules=True, height=250,
                                        gridOptions=trajectory.build(), update_mode=GridUpdateMode.SELECTION_CHANGED)
+
 
 
 main_window()

@@ -27,6 +27,7 @@ class Trajectory():
         self.actions = []
         self.rewards = []
         self.timesteps = []
+        self.scan_id = []
         self.flag = False
 
     def add_pairs(self, pairs: list):
@@ -35,10 +36,12 @@ class Trajectory():
             self.actions.append(pair[1])
             self.rewards.append(pair[2])
             self.timesteps.append(pair[3])
+            self.scan_id.append(pair[4])
         self.flag = True
 
     def get_df(self, max_peaks, feature_name):
-        df = pd.DataFrame({'timestep': self.timesteps, 'action': self.actions, 'reward': self.rewards})
+        df = pd.DataFrame({'timestep': self.timesteps, 'action': self.actions, 'reward': self.rewards,
+                           'scan_id': self.scan_id})
         for name in feature_name:
             feature_vector = []
             for i in range(len(self.actions)):
@@ -49,6 +52,7 @@ class Trajectory():
             df.insert(loc=3, column=name, value=feature_vector)
 
         return df
+
 
 class PriorityQueue():
     def __init__(self):
@@ -157,7 +161,7 @@ def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params
                 if method == METHOD_DQN:
                     if len(t) == t_length:
                         del (t[0])
-                    t.append([obs, int(action), round(reward, 4), episode.num_steps])
+                    t.append([obs, int(action), round(reward, 4), episode.num_steps, info['current_scan_id']])
                     if c > 0:
                         c -= 1
 
