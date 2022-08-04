@@ -68,7 +68,7 @@ if __name__ == "__main__":
         ri_sampler = MZMLRTandIntensitySampler(mzml_filename, min_rt=min_rt, max_rt=max_rt,
                                                min_log_intensity=min_log_intensity,
                                                max_log_intensity=max_log_intensity)
-        roi_params = RoiBuilderParams(min_roi_length=3, at_least_one_point_above=1000)
+        roi_params = RoiBuilderParams(min_roi_length=3, at_least_one_point_above=5E5)
         cr_sampler = MZMLChromatogramSampler(mzml_filename, roi_params=roi_params)
         samplers = {
             'mz': mz_sampler,
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     }
 
     max_peaks = 200
-    in_dir = 'results'
+    in_dir = 'results_%2.f' % alpha
 
     if socket.gethostname() == 'cauchy':
         num_env = 20
@@ -112,7 +112,7 @@ if __name__ == "__main__":
         dqn_torch_threads = 40
         ppo_timesteps = 15E6
         dqn_timesteps = 15E6
-        train_ppo = True
+        train_ppo = False
         train_dqn = True
         use_subproc = True
         single_save_freq = 100E6
