@@ -87,6 +87,8 @@ def get_parameters(preset_name):
             return preset_qcb_small()
         elif preset_name == 'QCB_chems_medium':
             return preset_qcb_medium()
+        elif preset_name == 'QCB_resimulated_medium':
+            return preset_qcb_medium(extract_chromatograms=True)
         elif preset_name == 'QCB_chems_large':
             return None, None  # not supported yet
 
