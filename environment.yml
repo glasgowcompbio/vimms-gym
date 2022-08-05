@@ -20,3 +20,4 @@ dependencies:
     - vimms
     - stable-baselines3
     - tensorboard
+    - optuna
