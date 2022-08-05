@@ -6,6 +6,8 @@ Created on 16/06/2022 20:42
 import time
 import sys
 
+import numpy as np
+
 sys.path.append('..')
 
 from viewer_helper import run_simulation, load_model_and_params, get_parameters, METHOD_DQN_COV, METHOD_DQN_INT, \
@@ -49,6 +51,7 @@ def main_window():
     if st.sidebar.button('Run episode') and 'chems' in st.session_state and policy not in st.session_state['results']:
         info_container = st.empty()
         with info_container.container():
+            # run training
             episode, env, T = train(environment, policy, st.session_state['params'], st.session_state['chems'],
                                     st.session_state['max_peaks'], budget, t_length, statesAfter, intervalSize)
             # store
@@ -111,6 +114,7 @@ def sidebar_policy():
 
 def sidebar_trajectory_params():
     st.sidebar.subheader('Trajectory parameters')
+    # input necessary
     budget = st.sidebar.number_input('Input number of trajectory', value=5)
     t_length = st.sidebar.number_input('Input the length of each trajectory', value=40)
     statesAfter = st.sidebar.number_input('Input the length of states after', value=10)
@@ -135,7 +139,8 @@ def Generate_chems(environment):
         st.error("parameters error!")
 
 
-def train(environment, policy, params, chems, max_peaks, budget, t_length, statesAfter, intervalSize):  # trainning function
+def train(environment, policy, params, chems, max_peaks, budget, t_length, statesAfter, intervalSize):
+    # trainning function
     if params is not None:
         # run simulation to generate an episode
         N, min_ms1_intensity, model, params = load_model_and_params(environment, policy, params)
@@ -215,18 +220,20 @@ def visual_window():  # interpretation part
                  'scan_id': scan_id})
             st.session_state['store'][result]['feature'] = df
         if st.session_state['sorted_chemicals'] is None or st.session_state['sorted_chemicals_df'] is None:
+            # sort chemicals by max intensity
             sorted_chemicals = st.session_state['chems']
             for i in range(len(sorted_chemicals)):
                 for j in range(len(sorted_chemicals) - 1 - i):
                     if sorted_chemicals[j].max_intensity < sorted_chemicals[j + 1].max_intensity:
                         sorted_chemicals[j], sorted_chemicals[j + 1] = sorted_chemicals[j + 1], sorted_chemicals[j]
-
+            # make df with related info
             mz = [round(chem.mass, 4) for chem in sorted_chemicals]
             rt = [round(chem.rt, 2) for chem in sorted_chemicals]
             max_intensity = [round(chem.max_intensity, 2) for chem in sorted_chemicals]
             idx = [sorted_chemicals.index(chem) + 1 for chem in sorted_chemicals]
             chemical_df = pd.DataFrame(
                 {'index': idx, 'mz': mz, 'rt': rt, 'max_intensity': max_intensity})
+            # store
             st.session_state['sorted_chemicals'] = sorted_chemicals
             st.session_state['sorted_chemicals_df'] = chemical_df
 
@@ -235,10 +242,12 @@ def visual_window():  # interpretation part
             st.caption('In VIMMS-Gym, the state consists of the feature vector of the precursor ion. '
                        'Below are the different features. '
                        'Buttons and sliders can be used to select features in different timesteps for observation.')
+            # Radio to control feature selection
             feature = st.radio('select a feature',
                                ('intensities', 'excluded', 'roi_length', 'roi_elapsed_time_since_last_frag',
                                 'roi_intensity_at_last_frag', 'roi_min_intensity_since_last_frag',
                                 'roi_max_intensity_since_last_frag'), horizontal=True)
+            # sliders to control range selection
             timestep_range = st.slider('select timestep range',
                                        0, episode.num_steps - 1, (0, episode.num_steps - 1))
             feature_range = st.slider('select feature range',
@@ -246,20 +255,22 @@ def visual_window():  # interpretation part
                                       round(max(st.session_state['store'][result]['feature'][feature]), 2),
                                       (round(min(st.session_state['store'][result]['feature'][feature]), 2),
                                        round(max(st.session_state['store'][result]['feature'][feature]), 2)))
-
+            # draw plots
             view_feature(result, feature, timestep_range, feature_range, link=False, link_data=None)
 
         elif vm == 'view chemicals':
             st.header('View Chemicals')
-
+            # do function
             view_chemical(result)
-
+            # control interactive function
             featureplot = st.empty()
             if not st.session_state['flag']:
                 featureplot.empty()
             if st.session_state['flag']:
                 with featureplot.container():
                     st.subheader('View timestep')
+                    st.caption(
+                        'These plots show the timestep around the one being selected.')
                     view_feature(result, link=True, link_data=st.session_state['link_data'])
                 st.session_state['flag'] = False
 
@@ -268,11 +279,12 @@ def visual_window():  # interpretation part
                 st.warning('topN model dose not have this function!!!')
             else:
                 st.header('View Trajectories')
+                # extract trajectory info
                 view_trajectory(result, max_peaks)
 
 
 def view_feature(result, feature=None, timestep_range=None, feature_range=None, link=False, link_data=None):
-    if link is False:
+    if link is False:  # finish the fuction of feature part
         ms2_frags = st.session_state['store'][result]['ms2_frags']
         # df is reconstructed according to the selected feature to realize slider-based control of the image
         # reset the axis range
@@ -284,14 +296,19 @@ def view_feature(result, feature=None, timestep_range=None, feature_range=None, 
         plot_df = plot_df[plot_df[feature] >= feature_range[0]]
         plot_df = plot_df[plot_df[feature] <= feature_range[1]]
         # draw plots
-        st.caption("The dots are clickable")
+        st.caption("In VIMMS-Gym, the chemicals are ranked from 0 to max peak in descending order of intensity "
+                   "in MS1 scan. Action is pick certain chemical to fragment. Reward is calculated according to "
+                   "the intensity. The dots can be clickable to show the chemical info at this timestep.")
         col3, col4 = st.columns(2)
         with col3:
             fig_ac = px.scatter(plot_df, x='timestep', y='action',
                                 title='Action vs timestep')
+            # interactive plots
             selected_points_ac = plotly_events(fig_ac, click_event=True)
             if selected_points_ac:
                 timestep = selected_points_ac[0]['x']
+                action = selected_points_ac[0]['y']
+                st.write('you select: timestep: ' + str(timestep) + ' ' + 'action: ' + str(action))
                 click_df = plot_df[plot_df['timestep'] == timestep]['scan_id']
                 scanid = click_df[click_df.index[0]]
                 e = [event for event in ms2_frags if event.scan_id == scanid]
@@ -299,15 +316,18 @@ def view_feature(result, feature=None, timestep_range=None, feature_range=None, 
         with col4:
             fig_re = px.scatter(plot_df, x='timestep', y='reward',
                                 title='Reward vs timestep')
+            # interactive plots
             selected_points_re = plotly_events(fig_re, click_event=True)
             if selected_points_re:
                 timestep = selected_points_re[0]['x']
+                reward = selected_points_re[0]['y']
+                st.write('you select: timestep: ' + str(timestep) + ' ' + 'reward: ' + str(reward))
                 click_df = plot_df[plot_df['timestep'] == timestep]['scan_id']
                 scanid = click_df[click_df.index[0]]
                 e = [event for event in ms2_frags if event.scan_id == scanid]
                 click_dots(e)
 
-    elif link is True:
+    elif link is True:  # finish function related to chemical part
         plot_df = st.session_state['store'][result]['feature'].loc[
                   link_data.index[0] - 5:link_data.index[0] + 6, :]
         new_feature_vector = []
@@ -329,6 +349,7 @@ def view_feature(result, feature=None, timestep_range=None, feature_range=None, 
 
 def click_dots(scan_events):
     st.write('related chemicals')
+    # if too many chemicals are contained in a timestep just hide them. Or webpage will be broken
     if len(scan_events) > 5:
         st.write(str(len(scan_events)) + ' frag events at this timestep, 5 are shown')
     elif len(scan_events) <= 1:
@@ -358,7 +379,14 @@ def click_dots(scan_events):
 
 
 def view_chemical(result):
+    st.caption('All the generated chemicals are shown in the following table, select one of them to observe the '
+               'fragmented information.')
     ms2_frags = st.session_state['store'][result]['ms2_frags']
+    coverage_p, intensity_p = get_proportion(ms2_frags, st.session_state['sorted_chemicals'])
+    st.write('Coverage proportion: ' + str(coverage_p))
+    st.write('Intensity proportion: ' + str(intensity_p))
+    st.caption('Coverage proportion measures how many chemicals a method is able to ‘hit’ with frag events.'
+               'Intensity proportion measures whether method can ‘hit’ with frag events at Max peak.')
     # make table
     gd = GridOptionsBuilder.from_dataframe(st.session_state['sorted_chemicals_df'])
     gd.configure_side_bar()
@@ -380,16 +408,19 @@ def view_chemical(result):
         while rt <= chrom.max_rt:
             X.append(rt + chemical.rt)
             Y.append(chrom.get_relative_intensity(rt))
-            rt += (chrom.max_rt - chrom.min_rt) / 19
+            rt += (chrom.max_rt - chrom.min_rt) / 29
         # draw plots
         if frags:
-            st.subheader('View chemicals')
+            st.subheader('View chromatogram of chemicals')
             fig = px.line(x=X, y=Y, labels={'x': 'RT', 'y': 'intensity'})
             for frag in frags:
                 fig.add_vline(x=frag.query_rt, line_width=1, line_dash="dash", line_color="green")
             st.plotly_chart(fig, use_container_width=True)
 
             st.subheader('Ms2 events info')
+            st.caption(
+                'This table shows the related fragmentation info of this chemical.')
+            # extract ms2 info and store in a df
             frag_df = []
             for frag in frags:
                 store = st.session_state['store'][result]['feature'][
@@ -402,7 +433,7 @@ def view_chemical(result):
             ms2_gd.configure_selection(selection_mode='single', use_checkbox=True)
             ms2_grid_table = AgGrid(frag_df, enable_enterprise_modules=True, height=300, gridOptions=ms2_gd.build(),
                                     update_mode=GridUpdateMode.SELECTION_CHANGED)
-            if ms2_grid_table["selected_rows"]:
+            if ms2_grid_table["selected_rows"]:  # store and pass the data to view_feature(link=True)
                 ms2_selection = ms2_grid_table["selected_rows"][0]['scan_id']
                 link_data = st.session_state['store'][result]['feature'][
                     st.session_state['store'][result]['feature']['scan_id'] == ms2_selection]
@@ -414,6 +445,7 @@ def view_chemical(result):
 
 
 def view_trajectory(result, max_peaks):
+    # extract trajectory objects and get info to show in a df
     feature_name = ['excluded', 'roi_length', 'roi_elapsed_time_since_last_frag',
                     'roi_intensity_at_last_frag', 'roi_min_intensity_since_last_frag',
                     'roi_max_intensity_since_last_frag', 'intensities']
@@ -424,28 +456,108 @@ def view_trajectory(result, max_peaks):
     t_gd.configure_side_bar()
     t_gd.configure_selection(selection_mode='single', use_checkbox=True)
     st.subheader('Trajectory Table')
+    st.caption('Importance is the difference between the maximum Q value and the minimum Q value of an action in '
+               'a certain state.')
     t_grid_table = AgGrid(t_table, enable_enterprise_modules=True, height=175,
                           gridOptions=t_gd.build(), update_mode=GridUpdateMode.SELECTION_CHANGED,
                           fit_columns_on_grid_load=True)
     if t_grid_table["selected_rows"]:
-        st.subheader('Detail info')
+        # show the related info of selected trajectory
         selection = int(t_grid_table["selected_rows"][0]['trajectory'].split(' ')[1]) - 1
         ms2_frags = st.session_state['store'][result]['ms2_frags']
         t_df = T.items[selection].get_df(max_peaks, feature_name)
-        # for scanid in t_df['scan_id']:
-        #
-        # chemical = []
-        # for scanid in t_df['scan_id']:
-        #     for e in ms2_frags:
-        #         if e.scan_id == scanid and e.chem not in chemical:
-        #             chemical.append(e.chem)
-
+        st.subheader('Detail info')
         trajectory = GridOptionsBuilder.from_dataframe(t_df)
         trajectory.configure_side_bar()
-        trajectory.configure_selection(selection_mode='single', use_checkbox=True)
-        trajectory_grid_table = AgGrid(t_df, enable_enterprise_modules=True, height=250,
-                                       gridOptions=trajectory.build(), update_mode=GridUpdateMode.SELECTION_CHANGED)
+        trajectory.configure_selection()
+        AgGrid(t_df, enable_enterprise_modules=True, height=250,
+               gridOptions=trajectory.build(), update_mode=GridUpdateMode.SELECTION_CHANGED)
 
+        st.subheader('Trajectory summary')
+        st.markdown('**statistics**')
+        # get chemicals
+        chemical = []
+        for scanid in t_df['scan_id']:
+            for e in ms2_frags:
+                if e.scan_id == scanid and e.chem not in chemical:
+                    chemical.append(e.chem)
+        # get coverage_p and intensity_p
+        coverage_p, intensity_p = get_proportion(ms2_frags, chemical)
+        # show info
+        st.write('Max q-value: ' + str(T.items[selection].maxq), 'Min q-value: ' + str(T.items[selection].minq))
+        st.write('Max reward: ' + str(max(t_df['reward'])), 'Min reward: ' + str(min(t_df['reward'])))
+        st.write('Coverage proportion: ' + str(coverage_p), 'Intensity proportion: ' + str(intensity_p))
+        st.write(str(len(chemical)) + ' chemicals has been fragmented in this trajectory')
+        # show plots
+        st.markdown('**distributions of actions and rewards**')
+        col11, col12 = st.columns(2)
+        with col11:
+            his_fig = px.histogram(t_df, x='action')
+            st.plotly_chart(his_fig, use_container_width=True)
+        with col12:
+            his_fig = px.histogram(t_df, x='reward')
+            st.plotly_chart(his_fig, use_container_width=True)
+
+        st.subheader('View timestep')
+        col9, col10 = st.columns(2)
+        with col9:
+            fig = px.scatter(t_df, x='timestep', y='action')
+            st.plotly_chart(fig, use_container_width=True)
+        with col10:
+            fig = px.scatter(t_df, x='timestep', y='reward')
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader('View fragmented chemicals in this trajectory')
+        # make df
+        chem_df = []
+        for i in range(len(chemical)):
+            store = pd.DataFrame({'index': [i+1], 'mz': [round(chemical[i].mass, 4)], 'rt': [round(chemical[i].rt, 4)],
+                                  'max_intensity': [round(chemical[i].max_intensity, 4)]})
+            chem_df.append(store)
+        chem_df = pd.concat(chem_df)
+        chem_gd = GridOptionsBuilder.from_dataframe(chem_df)
+        chem_gd.configure_side_bar()
+        chem_gd.configure_selection(selection_mode='single', use_checkbox=True)
+        chem_grid_table = AgGrid(chem_df, enable_enterprise_modules=True, height=250,
+                            gridOptions=chem_gd.build(), update_mode=GridUpdateMode.SELECTION_CHANGED,
+                            fit_columns_on_grid_load=True)
+        if chem_grid_table["selected_rows"]:
+            selection = chem_grid_table["selected_rows"][0]['index']
+            frags = [event for event in ms2_frags if chemical[selection - 1] == event.chem]
+            # extract related RT and intensities
+            chrom = chemical[selection - 1].chromatogram
+            X = []
+            Y = []
+            rt = chrom.min_rt
+            while rt <= chrom.max_rt:
+                X.append(rt + chemical[selection - 1].rt)
+                Y.append(chrom.get_relative_intensity(rt))
+                rt += (chrom.max_rt - chrom.min_rt) / 29
+            # draw
+            chem_fig = px.line(x=X, y=Y, labels={'x': 'RT', 'y': 'intensity'})
+            for frag in frags:
+                chem_fig.add_vline(x=frag.query_rt, line_width=1, line_dash="dash", line_color="green")
+            st.plotly_chart(chem_fig, use_container_width=True)
+
+
+
+
+def get_proportion(ms2_frags, chems):
+    all_intensity_props = []
+    count = 0
+    for chem in chems:
+        events = [event for event in ms2_frags if chem == event.chem]
+        chem_intensity_prop = 0.0
+        if len(events) > 0:
+            count += 1  # count how many chemicals are fragmented
+            # find the intensities of the chemical at each ms2 event (when it gets fragmented)
+            events_intensities = [event.parents_intensity[0] for event in events]
+            # divide the largest intensity during fragmentation with the maximum intensity possible of this chemical
+            chem_intensity_prop = max(events_intensities) / chem.max_intensity
+
+        all_intensity_props.append(chem_intensity_prop)
+    return round(count / len(st.session_state['chems']), 2), round(sum(all_intensity_props) / len(all_intensity_props),
+                                                                   4)
 
 
 main_window()

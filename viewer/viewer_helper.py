@@ -20,8 +20,8 @@ METHOD_DQN_COV = 'DQN (Coverage)'
 METHOD_DQN_INT = 'DQN (Intensity)'
 
 
-class Trajectory():
-    def __init__(self, importance):
+class Trajectory(): # object to store trajectory
+    def __init__(self, importance, max_Q, min_Q):
         self.importance = importance
         self.states = []
         self.actions = []
@@ -29,6 +29,8 @@ class Trajectory():
         self.timesteps = []
         self.scan_id = []
         self.flag = False
+        self.maxq = max_Q
+        self.minq = min_Q
 
     def add_pairs(self, pairs: list):
         for pair in pairs:
@@ -54,7 +56,7 @@ class Trajectory():
         return df
 
 
-class PriorityQueue():
+class PriorityQueue(): # Modified according to the template on the Internet
     def __init__(self):
         self.length = 0
         self.items = []
@@ -169,6 +171,7 @@ def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params
             if obs is not None:
                 episode.add_step_data(action, action_probs, obs, reward, info)
                 if method == METHOD_DQN:
+                    # using HIGHLIGHT
                     if len(t) == t_length:
                         del (t[0])
                     t.append([obs, int(action), round(reward, 4), episode.num_steps, info['current_scan_id']])
@@ -178,7 +181,9 @@ def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params
                     with th.no_grad():
                         obs_tensor, _ = model.q_net.obs_to_tensor(obs)
                         q_values = model.q_net(obs_tensor)
-                        importance = round(float(max(q_values[0]) - min(q_values[0])), 4)
+                        max_Q = round(float(max(q_values[0])), 4)
+                        min_Q = round(float(min(q_values[0])), 4)
+                        importance = round(max_Q - min_Q, 4)
                     if intervalSize - c == statesAfter:
                         T.items[T.indexes.index(i)].add_pairs(t)
 
@@ -187,7 +192,7 @@ def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params
                             if T.length == budget:
                                 T.pop()
                             i += 1
-                            tra = Trajectory(importance)
+                            tra = Trajectory(importance, max_Q, min_Q)
                             T.insert(tra, importance, i, budget)
                             T.order()
                             c = intervalSize
