@@ -117,7 +117,7 @@ def get_samplers(mzml_filename, samplers_pickle, min_mz, max_mz, min_rt, max_rt,
                                                min_log_intensity=min_log_intensity,
                                                max_log_intensity=max_log_intensity)
         if extract_chromatograms:
-            roi_params = RoiBuilderParams(min_roi_length=3, at_least_one_point_above=5000)
+            roi_params = RoiBuilderParams(min_roi_length=3, at_least_one_point_above=5E5)
             cr_sampler = MZMLChromatogramSampler(mzml_filename, roi_params=roi_params)
         else:
             cr_sampler = GaussianChromatogramSampler()
