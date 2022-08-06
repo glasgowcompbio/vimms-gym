@@ -3,6 +3,8 @@ import os
 import socket
 import sys
 
+from vimms.Common import create_if_not_exist
+
 sys.path.append('.')
 
 from experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, \
@@ -23,11 +25,14 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from vimms_gym.env import DDAEnv
 from vimms_gym.common import METHOD_PPO, METHOD_DQN
 
+GYM_NUM_ENV = 20
+GYM_ENV_NAME = 'DDAEnv'
+SINGLE_SAVE_FREQ = 10E6
+
 
 def train_model(model_name, timesteps, params, max_peaks, in_dir, use_subproc=True):
     assert model_name in [METHOD_PPO, METHOD_DQN]
 
-    num_env = 20
     torch_threads = 1  # Set pytorch num threads to 1 for faster training
     if socket.gethostname() == 'cauchy':  # except on cauchy where we have no gpu, only cpu
         torch_threads = 40
@@ -35,8 +40,7 @@ def train_model(model_name, timesteps, params, max_peaks, in_dir, use_subproc=Tr
 
     env = DDAEnv(max_peaks, params)
     check_env(env)
-    env_name = 'DDAEnv'
-    fname = '%s/%s_%s.zip' % (in_dir, env_name, model_name)
+    fname = '%s/%s_%s.zip' % (in_dir, GYM_ENV_NAME, model_name)
 
     def make_env(rank, seed=0):
         def _init():
@@ -49,11 +53,11 @@ def train_model(model_name, timesteps, params, max_peaks, in_dir, use_subproc=Tr
         return _init
 
     if not use_subproc:
-        env = DummyVecEnv([make_env(i) for i in range(num_env)])
+        env = DummyVecEnv([make_env(i) for i in range(GYM_NUM_ENV)])
     else:
-        env = SubprocVecEnv([make_env(i) for i in range(num_env)])
+        env = SubprocVecEnv([make_env(i) for i in range(GYM_NUM_ENV)])
 
-    tensorboard_log = './%s/%s_%s_tensorboard' % (in_dir, env_name, model_name)
+    tensorboard_log = os.path.join(in_dir, '%s_%s_tensorboard' % (GYM_ENV_NAME, model_name))
     model_params = params['model']
     if model_name == METHOD_PPO:
         model = PPO('MultiInputPolicy', env, tensorboard_log=tensorboard_log, verbose=2,
@@ -62,8 +66,7 @@ def train_model(model_name, timesteps, params, max_peaks, in_dir, use_subproc=Tr
         model = DQN('MultiInputPolicy', env, tensorboard_log=tensorboard_log, verbose=2,
                     **model_params)
 
-    single_save_freq = 10E6
-    save_freq = max(single_save_freq // num_env, 1)
+    save_freq = max(SINGLE_SAVE_FREQ // GYM_NUM_ENV, 1)
     checkpoint_callback = CheckpointCallback(save_freq=save_freq, save_path=in_dir,
                                              name_prefix='%s_checkpoint' % model_name)
     model.learn(total_timesteps=timesteps, callback=checkpoint_callback, log_interval=1)
@@ -81,7 +84,7 @@ if __name__ == '__main__':
     ], required=True, type=str, help='Specify model name')
 
     # environment parameters
-    parser.add_argument('--env_preset', choices=[
+    parser.add_argument('--preset', choices=[
         ENV_QCB_SMALL_GAUSSIAN,
         ENV_QCB_MEDIUM_GAUSSIAN,
         ENV_QCB_LARGE_GAUSSIAN,
@@ -89,32 +92,34 @@ if __name__ == '__main__':
         ENV_QCB_MEDIUM_EXTRACTED,
         ENV_QCB_LARGE_EXTRACTED
     ], required=True, type=str, help='Specify environmental preset')
-    parser.add_argument('--reward_alpha', default=0.5, type=float,
+    parser.add_argument('--alpha', default=0.5, type=float,
                         help='Weight parameter in the reward function')
 
     # other parameters
-    parser.add_argument('--results_dir', default=os.path.abspath('notebooks'), type=str,
+    parser.add_argument('--results', default=os.path.abspath('notebooks'), type=str,
                         help='Base location to store results')
     parser.add_argument('--optimise', default=False, type=bool,
                         help='Optimise hyper-parameters instead of training')
 
     args = parser.parse_args()
     model_name = args.model
-    alpha = args.reward_alpha
-    in_dir = args.results_dir + ('_%.2f' % alpha)
+    alpha = args.alpha
+    in_dir = os.path.abspath(args.results + ('_%.2f' % alpha))
+    create_if_not_exist(in_dir)
 
-    if args.env_preset == ENV_QCB_SMALL_GAUSSIAN:
-        params, max_peaks = preset_qcb_small(model_name, alpha=alpha, extract_chromatograms=False)
-    elif args.env_preset == ENV_QCB_MEDIUM_GAUSSIAN:
-        params, max_peaks = preset_qcb_medium(model_name, alpha=alpha, extract_chromatograms=False)
-    elif args.env_preset == ENV_QCB_LARGE_GAUSSIAN:
-        params, max_peaks = preset_qcb_large(model_name, alpha=alpha, extract_chromatograms=False)
-    elif args.env_preset == ENV_QCB_SMALL_EXTRACTED:
-        params, max_peaks = preset_qcb_small(model_name, alpha=alpha, extract_chromatograms=True)
-    elif args.env_preset == ENV_QCB_MEDIUM_EXTRACTED:
-        params, max_peaks = preset_qcb_medium(model_name, alpha=alpha, extract_chromatograms=True)
-    elif args.env_preset == ENV_QCB_LARGE_EXTRACTED:
-        params, max_peaks = preset_qcb_large(model_name, alpha=alpha, extract_chromatograms=True)
+    # choose one preset and generate parameters for it
+    presets = {
+        ENV_QCB_SMALL_GAUSSIAN: {'f': preset_qcb_small, 'extract': False},
+        ENV_QCB_MEDIUM_GAUSSIAN: {'f': preset_qcb_medium, 'extract': False},
+        ENV_QCB_LARGE_GAUSSIAN: {'f': preset_qcb_large, 'extract': False},
+        ENV_QCB_SMALL_EXTRACTED: {'f': preset_qcb_small, 'extract': True},
+        ENV_QCB_MEDIUM_EXTRACTED: {'f': preset_qcb_medium, 'extract': True},
+        ENV_QCB_LARGE_EXTRACTED: {'f': preset_qcb_large, 'extract': True},
+    }
+    preset_func = presets[args.preset]['f']
+    extract = presets[args.preset]['extract']
+    params, max_peaks = preset_func(model_name, alpha=alpha, extract_chromatograms=extract)
 
+    # actually train the model here
     timesteps = params['timesteps']
     train_model(model_name, timesteps, params, max_peaks, in_dir, use_subproc=True)
