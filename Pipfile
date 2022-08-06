@@ -19,6 +19,7 @@ stable-baselines3 = "*"
 tensorboard = "*"
 vimms = "*"
 streamlit = "*"
+optuna = "*"
 
 [dev-packages]
 twine = "*"
