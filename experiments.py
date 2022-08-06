@@ -40,7 +40,6 @@ def preset_qcb_small(model_name, alpha=0.5, extract_chromatograms=False):
             'exploration_final_eps': 0.10,
             'policy_kwargs': dict(net_arch=[hidden_nodes, hidden_nodes]),
         }
-        params['timesteps'] = 2E6
     elif model_name == METHOD_PPO:
         hidden_nodes = 512
         net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
@@ -55,7 +54,6 @@ def preset_qcb_small(model_name, alpha=0.5, extract_chromatograms=False):
                 net_arch=net_arch,
             ),
         }
-        params['timesteps'] = 2E6
     return params, max_peaks
 
 
@@ -80,7 +78,6 @@ def preset_qcb_medium(model_name, alpha=0.5, extract_chromatograms=False):
             'exploration_final_eps': 0.10,
             'policy_kwargs': dict(net_arch=[hidden_nodes, hidden_nodes]),
         }
-        params['timesteps'] = 15E6
     elif model_name == METHOD_PPO:
         hidden_nodes = 512
         net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
@@ -95,7 +92,6 @@ def preset_qcb_medium(model_name, alpha=0.5, extract_chromatograms=False):
                 net_arch=net_arch,
             ),
         }
-        params['timesteps'] = 15E6
     return params, max_peaks
 
 
@@ -120,7 +116,6 @@ def preset_qcb_large(model_name, alpha=0.5, extract_chromatograms=False):
             'exploration_final_eps': 0.10,
             'policy_kwargs': dict(net_arch=[hidden_nodes, hidden_nodes]),
         }
-        params['timesteps'] = 100E6
     elif model_name == METHOD_PPO:
         hidden_nodes = 512
         net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
@@ -135,7 +130,6 @@ def preset_qcb_large(model_name, alpha=0.5, extract_chromatograms=False):
                 net_arch=net_arch,
             ),
         }
-        params['timesteps'] = 100E6
     return params, max_peaks
 
 
@@ -145,7 +139,8 @@ def generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals, mz_range
                     enable_spike_noise=True, noise_density=0.1, noise_max_val=1E3,
                     min_roi_length=3, at_least_one_point_above=5E5):
     samplers_pickle_suffix = 'extracted' if extract_chromatograms else 'gaussian'
-    samplers_pickle = '%s_%suffix.p' % (samplers_pickle_prefix, samplers_pickle_suffix)
+    samplers_pickle = os.path.abspath(os.path.join(
+        'pickles', '%s_%s.p' % (samplers_pickle_prefix, samplers_pickle_suffix)))
     min_mz = mz_range[0]
     max_mz = mz_range[1]
     min_rt = rt_range[0]
