@@ -129,10 +129,10 @@ class Objective(object):
         # Create the RL model
         env = make_environment(self.max_peaks, self.params)
         model = init_model(self.model_name, sampled_hyperparams, env,
-                           out_dir=self.out_dir, verbose=2)
+                           out_dir=self.out_dir, verbose=0)
 
         # Create env used for evaluation
-        eval_env = DDAEnv(self.max_peaks, self.params)
+        eval_env = make_environment(self.max_peaks, self.params)
 
         # Create the callback that will periodically evaluate
         # and report the performance
@@ -145,7 +145,7 @@ class Objective(object):
         )
 
         try:
-            model.learn(self.timesteps, callback=eval_callback, log_interval=4)
+            model.learn(self.timesteps, callback=eval_callback)
             # Free memory
             model.env.close()
             eval_env.close()
@@ -248,7 +248,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     model_name = args.model
     alpha = args.alpha
-    out_dir = os.path.abspath(args.results + ('_%.2f' % alpha))
+    out_dir = os.path.abspath(os.path.join(args.results, 'results_%.2f' % alpha))
     create_if_not_exist(out_dir)
 
     # choose one preset and generate parameters for it
