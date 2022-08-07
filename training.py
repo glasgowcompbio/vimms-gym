@@ -5,6 +5,9 @@ import sys
 import time
 from pprint import pprint
 
+from loguru import logger
+import pylab as plt
+
 from optuna.pruners import MedianPruner
 from optuna.visualization import plot_optimization_history, plot_param_importances
 
@@ -31,7 +34,9 @@ from experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM
 
 from vimms.Common import create_if_not_exist, save_obj
 from vimms_gym.env import DDAEnv
-from vimms_gym.common import METHOD_PPO, METHOD_DQN
+from vimms_gym.common import METHOD_PPO, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
+    EVAL_METRIC_F1, EVAL_METRIC_COVERAGE_PROP, EVAL_METRIC_INTENSITY_PROP, \
+    EVAL_METRIC_MS1_MS2_RATIO, EVAL_METRIC_EFFICIENCY
 
 GYM_ENV_NAME = 'DDAEnv'
 if socket.gethostname() == 'cauchy':
@@ -43,53 +48,59 @@ else:
 TRAINING_CHECKPOINT_FREQ = 10E6
 TRAINING_CHECKPOINT_FREQ = max(TRAINING_CHECKPOINT_FREQ // GYM_NUM_ENV, 1)
 
-MIN_EVAL_FREQ = 1E5
-N_EVAL_EPISODES = 5
+EVAL_FREQ = 1E5
+N_TRIALS = 100
+N_EVAL_EPISODES = 30
 
 
-def train_model(model_name, timesteps, params, max_peaks, out_dir):
+def train(model_name, timesteps, params, max_peaks, out_dir, verbose=0):
     assert model_name in [METHOD_PPO, METHOD_DQN]
     set_torch_threads()
 
     model_params = params['model']
     env = make_environment(max_peaks, params)
-    model = init_model(model_name, model_params, env, out_dir=out_dir, verbose=2)
+    model = init_model(model_name, model_params, env, out_dir=out_dir, verbose=verbose)
 
     checkpoint_callback = CheckpointCallback(
         save_freq=TRAINING_CHECKPOINT_FREQ, save_path=out_dir,
         name_prefix='%s_checkpoint' % model_name)
-    model.learn(total_timesteps=timesteps, callback=checkpoint_callback, log_interval=1)
+    log_interval = 1 if verbose == 2 else 4
+    model.learn(total_timesteps=timesteps, callback=checkpoint_callback, log_interval=log_interval)
     fname = '%s/%s_%s.zip' % (out_dir, GYM_ENV_NAME, model_name)
     model.save(fname)
 
 
-def tune_model(model_name, timesteps, params, max_peaks, out_dir, n_trials, n_evaluations,
-               n_startup_trials=0):
+def tune(model_name, timesteps, params, max_peaks, out_dir,
+         n_trials, n_eval_episodes, eval_freq, eval_metric, tune_model,
+         tune_reward, n_startup_trials=0, verbose=0):
     assert model_name in [METHOD_PPO, METHOD_DQN]
     set_torch_threads()
 
     sampler = TPESampler(n_startup_trials=n_startup_trials)
     # Do not prune before 1/3 of the max budget is used
+    n_evaluations = max(1, timesteps // int(eval_freq))
     pruner = MedianPruner(n_startup_trials=n_startup_trials, n_warmup_steps=n_evaluations // 3)
-    print(
+    logger.info(
         f"Doing {int(n_evaluations)} intermediate evaluations for pruning based on the number of timesteps."
-        f" (1 evaluation every {int(MIN_EVAL_FREQ)} timesteps)"
+        f" (1 evaluation every {int(eval_freq)} timesteps)"
     )
 
     study = optuna.create_study(sampler=sampler, pruner=pruner, direction='maximize')
     try:
-        objective = Objective(model_name, timesteps, params, max_peaks, out_dir, n_evaluations)
+        objective = Objective(model_name, timesteps, params, max_peaks, out_dir,
+                              n_evaluations, n_eval_episodes, eval_metric,
+                              tune_model, tune_reward, verbose=verbose)
         study.optimize(objective, n_trials=n_trials)
     except KeyboardInterrupt:
         pass
 
     trial = study.best_trial
-    print('Number of finished trials: ', len(study.trials))
-    print('Best trial:')
-    print('Value: ', trial.value)
-    print('Params: ')
+    logger.info('Number of finished trials: ', len(study.trials))
+    logger.info('Best trial:')
+    logger.info('Value: ', trial.value)
+    logger.info('Params: ')
     for key, value in trial.params.items():
-        print(f'    {key}: {value}')
+        logger.info(f'    {key}: {value}')
 
     # create report dir
     report_path = f'report_{GYM_ENV_NAME}_{max_peaks}_{n_trials}_{timesteps}_{int(time.time())}'
@@ -103,36 +114,62 @@ def tune_model(model_name, timesteps, params, max_peaks, out_dir, n_trials, n_ev
     # Plot optimization result
     try:
         fig1 = plot_optimization_history(study)
+        fig1.write_image(os.path.join(log_dir, 'fig1.png'))
         fig2 = plot_param_importances(study)
-        fig1.savefig(os.path.join(log_dir, 'fig1.png'))
-        fig2.savefig(os.path.join(log_dir, 'fig2.png'))
+        fig2.write_image(os.path.join(log_dir, 'fig2.png'))
     except (ValueError, ImportError, RuntimeError):
         pass
 
 
 class Objective(object):
-    def __init__(self, model_name, timesteps, params, max_peaks, out_dir, n_evaluations):
+    def __init__(self, model_name, timesteps, params, max_peaks, out_dir,
+                 n_evaluations, n_eval_episodes, eval_metric, tune_model, tune_reward,
+                 verbose=0):
         self.model_name = model_name
         self.timesteps = timesteps
         self.params = params
         self.max_peaks = max_peaks
         self.out_dir = out_dir
         self.n_evaluations = n_evaluations
+        self.n_eval_episodes = n_eval_episodes
+        self.eval_metric = eval_metric
+        self.tune_model = tune_model
+        self.tune_reward = tune_reward
+        self.verbose = verbose
 
     def __call__(self, trial):
-        # Sample hyperparameters
-        if model_name == METHOD_PPO:
-            sampled_hyperparams = sample_ppo_params(trial)
-        elif model_name == METHOD_DQN:
-            sampled_hyperparams = sample_dqn_params(trial)
+        # Sample parameters
+        if self.model_name == METHOD_PPO:
+            sampled_params = sample_ppo_params(trial, self.tune_model, self.tune_reward)
+        elif self.model_name == METHOD_DQN:
+            sampled_params = sample_dqn_params(trial, self.tune_model, self.tune_reward)
+
+        # Generate model and reward parameters
+        if self.tune_model:  # if tuning, use the sampled model parameters
+            model_params = dict(sampled_params)
+            try:
+                del model_params['alpha']
+                del model_params['beta']
+            except KeyError:
+                pass
+        else:  # otherwise use pre-defined model parameters
+            model_params = self.params['model']
+
+        if self.tune_reward:  # if tuning, use the sampled reward parameters
+            self.params['env']['alpha'] = sampled_params['alpha']
+            self.params['env']['beta'] = sampled_params['beta']
+        else:  # otherwise leave them as they are
+            pass
 
         # Create the RL model
         env = make_environment(self.max_peaks, self.params)
-        model = init_model(self.model_name, sampled_hyperparams, env,
-                           out_dir=self.out_dir, verbose=0)
+        model = init_model(self.model_name, model_params, env, out_dir=self.out_dir,
+                           verbose=self.verbose)
 
         # Create env used for evaluation
-        eval_env = make_environment(self.max_peaks, self.params)
+        # eval_env = make_environment(self.max_peaks, self.params)
+        eval_env = DDAEnv(self.max_peaks, self.params)
+        eval_env = Monitor(eval_env)
 
         # Create the callback that will periodically evaluate
         # and report the performance
@@ -140,12 +177,15 @@ class Objective(object):
         optuna_eval_freq = max(optuna_eval_freq // GYM_NUM_ENV,
                                1)  # adjust for multiple environments
         eval_callback = TrialEvalCallback(
-            eval_env, trial, best_model_save_path=self.out_dir, log_path=self.out_dir,
-            n_eval_episodes=N_EVAL_EPISODES, eval_freq=optuna_eval_freq, deterministic=True
+            eval_env, trial, self.eval_metric, best_model_save_path=self.out_dir,
+            log_path=self.out_dir,
+            n_eval_episodes=self.n_eval_episodes, eval_freq=optuna_eval_freq, deterministic=True,
+            verbose=self.verbose
         )
 
         try:
-            model.learn(self.timesteps, callback=eval_callback)
+            log_interval = 1 if self.verbose == 2 else 4
+            model.learn(self.timesteps, callback=eval_callback, log_interval=log_interval)
             # Free memory
             model.env.close()
             eval_env.close()
@@ -157,8 +197,8 @@ class Objective(object):
             # Prune hyperparams that generate NaNs
             print(e)
             print('============')
-            print('Sampled hyperparams:')
-            pprint(sampled_hyperparams)
+            print('Sampled parameters:')
+            pprint(sampled_params)
             raise optuna.exceptions.TrialPruned()
         is_pruned = eval_callback.is_pruned
         reward = eval_callback.last_mean_reward
@@ -221,6 +261,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--results', default=os.path.abspath('notebooks'), type=str,
                         help='Base location to store results')
+    parser.add_argument('--verbose', default=0, type=int,
+                        help='Verbosity level')
 
     # model parameters
     parser.add_argument('--model', choices=[
@@ -228,10 +270,25 @@ if __name__ == '__main__':
         METHOD_DQN
     ], required=True, type=str, help='Specify model name')
     parser.add_argument('--timesteps', required=True, type=float, help='Training timesteps')
-    parser.add_argument('--tune', action='store_true',
-                        help='Optimise hyper-parameters instead of training')
-    parser.add_argument('--n_trials', default=100, type=int,
-                        help='How many trials for optuna tuning')
+    parser.add_argument('--tune_model', action='store_true',
+                        help='Optimise model parameters instead of training')
+    parser.add_argument('--tune_reward', action='store_true',
+                        help='Optimise reward parameters instead of training')
+    parser.add_argument('--n_trials', default=N_TRIALS, type=int,
+                        help='How many trials in optuna tuning')
+    parser.add_argument('--n_eval_episodes', default=N_EVAL_EPISODES, type=int,
+                        help='How many evaluation episodes in optuna tuning')
+    parser.add_argument('--eval_freq', default=EVAL_FREQ, type=float,
+                        help='Frequency of intermediate evaluation steps before pruning an '
+                             'episode in optuna tuning')
+    parser.add_argument('--eval_metric', choices=[
+        EVAL_METRIC_REWARD,
+        EVAL_METRIC_F1,
+        EVAL_METRIC_COVERAGE_PROP,
+        EVAL_METRIC_INTENSITY_PROP,
+        EVAL_METRIC_MS1_MS2_RATIO,
+        EVAL_METRIC_EFFICIENCY
+    ], required=True, type=str, help='Specify evaluation metric in optuna tuning')
 
     # environment parameters
     parser.add_argument('--preset', choices=[
@@ -242,13 +299,22 @@ if __name__ == '__main__':
         ENV_QCB_MEDIUM_EXTRACTED,
         ENV_QCB_LARGE_EXTRACTED
     ], required=True, type=str, help='Specify environmental preset')
-    parser.add_argument('--alpha', default=0.5, type=float,
-                        help='Weight parameter in the reward function')
+    parser.add_argument('--alpha', default=ALPHA, type=float,
+                        help='First weight parameter in the reward function')
+    parser.add_argument('--beta', default=BETA, type=float,
+                        help='Second weight parameter in the reward function')
 
     args = parser.parse_args()
     model_name = args.model
-    alpha = args.alpha
-    out_dir = os.path.abspath(os.path.join(args.results, 'results_%.2f' % alpha))
+    if args.tune_reward:
+        alpha = None
+        beta = None
+        out_dir = os.path.abspath(os.path.join(args.results, 'results'))
+    else:
+        alpha = args.alpha
+        beta = args.beta
+        out_dir = os.path.abspath(
+            os.path.join(args.results, 'results_alpha_%.2f_beta_%.2f' % (alpha, beta)))
     create_if_not_exist(out_dir)
 
     # choose one preset and generate parameters for it
@@ -262,13 +328,13 @@ if __name__ == '__main__':
     }
     preset_func = presets[args.preset]['f']
     extract = presets[args.preset]['extract']
-    params, max_peaks = preset_func(model_name, alpha=alpha, extract_chromatograms=extract)
+    params, max_peaks = preset_func(model_name, alpha=alpha, beta=beta,
+                                    extract_chromatograms=extract)
 
     # actually train the model here
-    timesteps = args.timesteps
-    n_trials = args.n_trials
-    if args.tune:
-        n_evaluations = max(1, timesteps // int(MIN_EVAL_FREQ))
-        tune_model(model_name, timesteps, params, max_peaks, out_dir, n_trials, n_evaluations)
+    if args.tune_model or args.tune_reward:
+        tune(model_name, args.timesteps, params, max_peaks, out_dir, args.n_trials,
+             args.n_eval_episodes, int(args.eval_freq), args.eval_metric,
+             args.tune_model, args.tune_reward, verbose=args.verbose)
     else:
-        train_model(model_name, timesteps, params, max_peaks, out_dir)
+        train(model_name, args.timesteps, params, max_peaks, out_dir, verbose=args.verbose)

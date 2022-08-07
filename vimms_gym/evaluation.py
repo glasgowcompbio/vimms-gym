@@ -46,7 +46,7 @@ class Episode():
         return np.sum(self.rewards)
 
 
-def evaluate(env, intensity_threshold):
+def evaluate(env, intensity_threshold=0.5, format_output=True):
     # env can be either a DDAEnv or a ViMMS' Environment object
     try:
         vimms_env = env.vimms_env
@@ -58,8 +58,14 @@ def evaluate(env, intensity_threshold):
     count_fragmented = np.count_nonzero(vimms_env_res['times_fragmented'])
     count_ms1 = len(vimms_env.controller.scans[1])
     count_ms2 = len(vimms_env.controller.scans[2])
-    ms1_ms2_ratio = float(count_ms1) / count_ms2
-    efficiency = float(count_fragmented) / count_ms2
+    try:
+        ms1_ms2_ratio = float(count_ms1) / count_ms2
+    except ZeroDivisionError:
+        ms1_ms2_ratio = 0.0
+    try:
+        efficiency = float(count_fragmented) / count_ms2
+    except ZeroDivisionError:
+        efficiency = 0.0
 
     # get all base chemicals used as input to the mass spec
     all_chems = set(
@@ -116,18 +122,33 @@ def evaluate(env, intensity_threshold):
     except ZeroDivisionError:
         f1 = 0.0
 
-    eval_res = {
-        'coverage_prop': '%.3f' % vimms_env_res['coverage_proportion'][0],
-        'intensity_prop': '%.3f' % vimms_env_res['intensity_proportion'][0],
-        'ms1/ms2 ratio': '%.3f' % ms1_ms2_ratio,
-        'efficiency': '%.3f' % efficiency,
-        'TP': '%d' % TP,
-        'FP': '%d' % FP,
-        'FN': '%d' % FN,
-        'precision': '%.3f' % precision,
-        'recall': '%.3f' % recall,
-        'f1': '%.3f' % f1
-    }
+    if format_output:
+        eval_res = {
+            'coverage_prop': '%.3f' % vimms_env_res['coverage_proportion'][0],
+            'intensity_prop': '%.3f' % vimms_env_res['intensity_proportion'][0],
+            'ms1ms2_ratio': '%.3f' % ms1_ms2_ratio,
+            'efficiency': '%.3f' % efficiency,
+            'TP': '%d' % TP,
+            'FP': '%d' % FP,
+            'FN': '%d' % FN,
+            'precision': '%.3f' % precision,
+            'recall': '%.3f' % recall,
+            'f1': '%.3f' % f1
+        }
+    else:
+        eval_res = {
+            'coverage_prop': vimms_env_res['coverage_proportion'][0],
+            'intensity_prop': vimms_env_res['intensity_proportion'][0],
+            'ms1/ms1ms2_ratio': ms1_ms2_ratio,
+            'efficiency': efficiency,
+            'TP': TP,
+            'FP': FP,
+            'FN': FN,
+            'precision': precision,
+            'recall': recall,
+            'f1': f1
+        }
+
     return eval_res
 
 

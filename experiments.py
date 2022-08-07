@@ -8,7 +8,7 @@ from vimms.ChemicalSamplers import MZMLFormulaSampler, MZMLRTandIntensitySampler
 from vimms.Common import POSITIVE, load_obj, save_obj
 from vimms.Roi import RoiBuilderParams
 
-from vimms_gym.common import METHOD_DQN, linear_schedule, METHOD_PPO
+from vimms_gym.common import linear_schedule, METHOD_DQN, METHOD_PPO, ALPHA, BETA
 
 ENV_QCB_SMALL_GAUSSIAN = 'QCB_chems_small'
 ENV_QCB_MEDIUM_GAUSSIAN = 'QCB_chems_medium'
@@ -19,7 +19,7 @@ ENV_QCB_MEDIUM_EXTRACTED = 'QCB_resimulated_medium'
 ENV_QCB_LARGE_EXTRACTED = 'QCB_resimulated_large'
 
 
-def preset_qcb_small(model_name, alpha=0.5, extract_chromatograms=False):
+def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
     max_peaks = 100
     mzml_filename = os.path.abspath(os.path.join('', 'notebooks', 'fullscan_QCB.mzML'))
     samplers_pickle_prefix = 'samplers_QCB_small'
@@ -27,9 +27,12 @@ def preset_qcb_small(model_name, alpha=0.5, extract_chromatograms=False):
     mz_range = (100, 110)
     rt_range = (400, 500)
     intensity_range = (1E4, 1E20)
+
     params = generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals,
                              mz_range, rt_range, intensity_range, extract_chromatograms)
     params['env']['alpha'] = alpha
+    params['env']['beta'] = beta
+
     if model_name == METHOD_DQN:
         hidden_nodes = 512
         params['model'] = {
@@ -57,7 +60,7 @@ def preset_qcb_small(model_name, alpha=0.5, extract_chromatograms=False):
     return params, max_peaks
 
 
-def preset_qcb_medium(model_name, alpha=0.5, extract_chromatograms=False):
+def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
     max_peaks = 200
     mzml_filename = os.path.abspath(os.path.join('', 'notebooks', 'fullscan_QCB.mzML'))
     samplers_pickle_prefix = 'samplers_QCB_medium'
@@ -65,9 +68,12 @@ def preset_qcb_medium(model_name, alpha=0.5, extract_chromatograms=False):
     mz_range = (100, 600)
     rt_range = (400, 800)
     intensity_range = (1E4, 1E20)
+
     params = generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals,
                              mz_range, rt_range, intensity_range, extract_chromatograms)
     params['env']['alpha'] = alpha
+    params['env']['beta'] = beta
+
     if model_name == METHOD_DQN:
         hidden_nodes = 512
         params['model'] = {
@@ -95,7 +101,7 @@ def preset_qcb_medium(model_name, alpha=0.5, extract_chromatograms=False):
     return params, max_peaks
 
 
-def preset_qcb_large(model_name, alpha=0.5, extract_chromatograms=False):
+def preset_qcb_large(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
     max_peaks = 200
     mzml_filename = os.path.abspath(os.path.join('', 'notebooks', 'fullscan_QCB.mzML'))
     samplers_pickle_prefix = 'samplers_QCB_large'
@@ -103,9 +109,12 @@ def preset_qcb_large(model_name, alpha=0.5, extract_chromatograms=False):
     mz_range = (70, 1000)
     rt_range = (0, 1440)
     intensity_range = (1E4, 1E20)
+
     params = generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals,
                              mz_range, rt_range, intensity_range, extract_chromatograms)
     params['env']['alpha'] = alpha
+    params['env']['beta'] = beta
+
     if model_name == METHOD_DQN:
         hidden_nodes = 512
         params['model'] = {

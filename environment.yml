@@ -21,3 +21,4 @@ dependencies:
     - stable-baselines3
     - tensorboard
     - optuna
+    - kaleido

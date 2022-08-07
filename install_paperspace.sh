@@ -1,5 +1,5 @@
 cd ..
-pip install loguru vimms stable-baselines3
+pip install streamlit loguru vimms stable-baselines3 optuna kaleido
 apt-get install -y htop
 
 cd /notebooks/bin

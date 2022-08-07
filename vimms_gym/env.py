@@ -18,7 +18,7 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, INVALID_MOVE_REWARD, \
     MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
-    RENDER_RGB_ARRAY, render_scan, ALPHA
+    RENDER_RGB_ARRAY, render_scan, ALPHA, BETA
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -42,6 +42,7 @@ class DDAEnv(gym.Env):
         self.noise_params = params['noise']
         self.env_params = params['env']
         self.alpha = ALPHA if 'alpha' not in self.env_params else self.env_params['alpha']
+        self.beta = BETA if 'beta' not in self.env_params else self.env_params['beta']
 
         self.mz_tol = self.env_params['mz_tol']
         self.rt_tol = self.env_params['rt_tol']
@@ -510,25 +511,23 @@ class DDAEnv(gym.Env):
                     # TODO: assume only 1 chemical has been fragmented
                     # works for DDA but not for DIA
                     frag_event = frag_events[0]
-                    new_intensity = frag_event.parents_intensity[0]
+                    chem_frag_int = frag_event.parents_intensity[0]
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
                     if chem not in self.frag_chem_intensity:
-                        self.frag_chem_intensity[chem] = 0
+                        chem_last_frag_int = 0.0
                         coverage_reward = 1.0
                     else:
-                        self.frag_chem_intensity[chem] += 1
+                        chem_last_frag_int = self.frag_chem_intensity[chem]
                         coverage_reward = 0.0
 
-                    # n = self.frag_chem_intensity[chem]
-                    # mult = (1/2)**n
+                    # store new intensity into dictionary
+                    self.frag_chem_intensity[chem] = chem_frag_int
 
-                    # n = self.frag_chem_intensity[chem] + 1
-                    # mult = 1.0/n
-
-                    mult = 1.0
-                    intensity_reward = mult * (new_intensity / chem.max_intensity)
+                    # compute the overall reward
+                    intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
+                    intensity_reward = intensity_reward / chem.max_intensity
                     reward = (self.alpha * coverage_reward) + ((1-self.alpha) * intensity_reward)
 
                 else:

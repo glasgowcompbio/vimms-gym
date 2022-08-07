@@ -7,6 +7,7 @@ MAX_OBSERVED_LOG_INTENSITY = np.log(1E20)
 MAX_ROI_LENGTH_SECONDS = 100
 
 ALPHA = 0.5
+BETA = 0
 
 METHOD_RANDOM = 'random'
 METHOD_FULLSCAN = 'fullscan'
@@ -19,6 +20,12 @@ METHOD_DQN_INT = 'DQN_INT'
 RENDER_HUMAN = 'human'
 RENDER_RGB_ARRAY = 'rgb_array'
 
+EVAL_METRIC_REWARD = 'reward'
+EVAL_METRIC_F1 = 'f1'
+EVAL_METRIC_COVERAGE_PROP = 'coverage_prop'
+EVAL_METRIC_INTENSITY_PROP = 'intensity_prop'
+EVAL_METRIC_MS1_MS2_RATIO = 'ms1ms2_ratio'
+EVAL_METRIC_EFFICIENCY = 'efficiency'
 
 def clip_value(value, max_value, min_range=0.0, max_range=1.0):
     '''

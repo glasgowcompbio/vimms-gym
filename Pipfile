@@ -20,6 +20,7 @@ tensorboard = "*"
 vimms = "*"
 streamlit = "*"
 optuna = "*"
+kaleido = "*"
 
 [dev-packages]
 twine = "*"
