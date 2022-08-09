@@ -229,13 +229,13 @@ class TrialEvalCallback(EvalCallback):
                     self.evaluations_successes.append(self._is_success_buffer)
                     kwargs = dict(successes=self.evaluations_successes)
 
-                np.savez(
-                    self.log_path,
-                    timesteps=self.evaluations_timesteps,
-                    results=self.evaluations_results,
-                    ep_lengths=self.evaluations_length,
-                    **kwargs,
-                )
+                # np.savez(
+                #     self.log_path,
+                #     timesteps=self.evaluations_timesteps,
+                #     results=self.evaluations_results,
+                #     ep_lengths=self.evaluations_length,
+                #     **kwargs,
+                # )
 
             mean_reward, std_reward = np.mean(episode_rewards), np.std(episode_rewards)
             mean_ep_length, std_ep_length = np.mean(episode_lengths), np.std(episode_lengths)

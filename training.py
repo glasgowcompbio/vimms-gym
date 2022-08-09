@@ -2,12 +2,10 @@ import argparse
 import os
 import socket
 import sys
-import time
+import uuid
 from pprint import pprint
 
 from loguru import logger
-import pylab as plt
-
 from optuna.pruners import MedianPruner
 from optuna.visualization import plot_optimization_history, plot_param_importances
 
@@ -32,7 +30,7 @@ from experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM
     ENV_QCB_LARGE_GAUSSIAN, ENV_QCB_SMALL_EXTRACTED, ENV_QCB_MEDIUM_EXTRACTED, \
     ENV_QCB_LARGE_EXTRACTED, preset_qcb_medium, preset_qcb_large
 
-from vimms.Common import create_if_not_exist, save_obj
+from vimms.Common import create_if_not_exist
 from vimms_gym.env import DDAEnv
 from vimms_gym.common import METHOD_PPO, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
     EVAL_METRIC_F1, EVAL_METRIC_COVERAGE_PROP, EVAL_METRIC_INTENSITY_PROP, \
@@ -85,7 +83,12 @@ def tune(model_name, timesteps, params, max_peaks, out_dir,
         f" (1 evaluation every {int(eval_freq)} timesteps)"
     )
 
-    study = optuna.create_study(sampler=sampler, pruner=pruner, direction='maximize')
+    # Add stream handler of stdout to show the messages
+    study_name = f'{model_name}'
+    db_name = os.path.abspath(os.path.join(out_dir, 'study.db'))
+    storage_name = f'sqlite:///{db_name}'
+    study = optuna.create_study(study_name=study_name, storage=storage_name, load_if_exists=True,
+                                pruner=pruner, direction='maximize')
     try:
         objective = Objective(model_name, timesteps, params, max_peaks, out_dir,
                               n_evaluations, n_eval_episodes, eval_metric,
@@ -102,21 +105,18 @@ def tune(model_name, timesteps, params, max_peaks, out_dir,
     for key, value in trial.params.items():
         logger.info(f'    {key}: {value}')
 
-    # create report dir
-    report_path = f'report_{GYM_ENV_NAME}_{max_peaks}_{n_trials}_{timesteps}_{int(time.time())}'
-    log_dir = os.path.join(out_dir, model_name, report_path)
-    create_if_not_exist(log_dir)
-
     # Write report csv and pickle
-    study.trials_dataframe().to_csv(os.path.join(log_dir, 'study.csv'))
-    save_obj(study, os.path.join(log_dir, 'study.p'))
+    i = 0
+    while os.path.exists(os.path.join(out_dir, f'study_{i}.csv')):
+        i += 1
+    study.trials_dataframe().to_csv(os.path.join(out_dir, f'study_{i}.csv'))
 
     # Plot optimization result
     try:
         fig1 = plot_optimization_history(study)
-        fig1.write_image(os.path.join(log_dir, 'fig1.png'))
+        fig1.write_image(os.path.join(out_dir, f'fig1_{i}.png'))
         fig2 = plot_param_importances(study)
-        fig2.write_image(os.path.join(log_dir, 'fig2.png'))
+        fig2.write_image(os.path.join(out_dir, f'fig2_{i}.png'))
     except (ValueError, ImportError, RuntimeError):
         pass
 
@@ -309,12 +309,12 @@ if __name__ == '__main__':
     if args.tune_reward:
         alpha = None
         beta = None
-        out_dir = os.path.abspath(os.path.join(args.results, 'results'))
+        out_dir = os.path.abspath(os.path.join(args.results, 'results', args.model))
     else:
         alpha = args.alpha
         beta = args.beta
         out_dir = os.path.abspath(
-            os.path.join(args.results, 'results_alpha_%.2f_beta_%.2f' % (alpha, beta)))
+            os.path.join(args.results, 'results_alpha_%.2f_beta_%.2f' % (alpha, beta), args.model))
     create_if_not_exist(out_dir)
 
     # choose one preset and generate parameters for it
