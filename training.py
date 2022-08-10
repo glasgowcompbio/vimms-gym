@@ -288,7 +288,7 @@ if __name__ == '__main__':
         EVAL_METRIC_INTENSITY_PROP,
         EVAL_METRIC_MS1_MS2_RATIO,
         EVAL_METRIC_EFFICIENCY
-    ], required=True, type=str, help='Specify evaluation metric in optuna tuning')
+    ], type=str, help='Specify evaluation metric in optuna tuning')
 
     # environment parameters
     parser.add_argument('--preset', choices=[
