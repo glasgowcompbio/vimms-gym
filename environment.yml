@@ -21,4 +21,5 @@ dependencies:
     - stable-baselines3
     - tensorboard
     - optuna
+    - plotly
     - kaleido
