@@ -172,6 +172,22 @@ class TrialEvalCallback(EvalCallback):
         self.is_pruned = False
         self.eval_metric = eval_metric
 
+    def _init_callback(self) -> None:
+        # Does not work in some corner cases, where the wrapper is not the same
+        if not isinstance(self.training_env, type(self.eval_env)):
+            # warnings.warn("Training and eval env are not of the same type" f"{self.training_env} != {self.eval_env}")
+            pass
+
+        # Create folders if needed
+        if self.best_model_save_path is not None:
+            os.makedirs(self.best_model_save_path, exist_ok=True)
+        if self.log_path is not None:
+            os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
+
+        # Init callback called on new best model
+        if self.callback_on_new_best is not None:
+            self.callback_on_new_best.init_callback(self.model)
+
     def _on_step(self):
         if self.eval_freq > 0 and self.n_calls % self.eval_freq == 0:
             if self.verbose > 0:

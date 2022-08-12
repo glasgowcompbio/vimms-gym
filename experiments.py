@@ -92,14 +92,31 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
     params['env']['beta'] = beta
 
     if model_name == METHOD_DQN:
+        gamma = 0.999
+        learning_rate = 0.00018059
+        batch_size = 512
+        buffer_size = 50000
+        train_freq = 4
+        subsample_steps = 4
+        gradient_steps = max(train_freq // subsample_steps, 1)
+        exploration_fraction = 0.023036701
+        exploration_final_eps = 0.132604162
+        target_update_interval = 20000
+        learning_starts = 20000
         hidden_nodes = 512
+        policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {
-            'gamma': 0.90,
-            'learning_rate': linear_schedule(0.0003, min_value=0.0001),
-            'batch_size': 512,
-            'exploration_fraction': 0.25,
-            'exploration_final_eps': 0.10,
-            'policy_kwargs': dict(net_arch=[hidden_nodes, hidden_nodes]),
+            'gamma': gamma,
+            'learning_rate': learning_rate,
+            'batch_size': batch_size,
+            'buffer_size': buffer_size,
+            'train_freq': train_freq,
+            'gradient_steps': gradient_steps,
+            'exploration_fraction': exploration_fraction,
+            'exploration_final_eps': exploration_final_eps,
+            'target_update_interval': target_update_interval,
+            'learning_starts': learning_starts,
+            'policy_kwargs': policy_kwargs
         }
     elif model_name == METHOD_PPO:
         hidden_nodes = 512
@@ -128,7 +145,8 @@ def preset_qcb_large(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
     intensity_range = (1E4, 1E20)
 
     params = generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals,
-                             mz_range, rt_range, intensity_range, extract_chromatograms)
+                             mz_range, rt_range, intensity_range, extract_chromatograms,
+                             at_least_one_point_above=1E5)
     params['env']['alpha'] = alpha
     params['env']['beta'] = beta
 

@@ -37,12 +37,13 @@ from vimms_gym.common import METHOD_PPO, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_RE
     EVAL_METRIC_MS1_MS2_RATIO, EVAL_METRIC_EFFICIENCY
 
 GYM_ENV_NAME = 'DDAEnv'
-if socket.gethostname() == 'cauchy':
-    GYM_NUM_ENV = 20
-    USE_SUBPROC = True
-else:
+if socket.gethostname() == 'Macbook-Air.local':
     GYM_NUM_ENV = 1
     USE_SUBPROC = False
+else:
+    GYM_NUM_ENV = 20
+    USE_SUBPROC = True
+
 TRAINING_CHECKPOINT_FREQ = 10E6
 TRAINING_CHECKPOINT_FREQ = max(TRAINING_CHECKPOINT_FREQ // GYM_NUM_ENV, 1)
 
