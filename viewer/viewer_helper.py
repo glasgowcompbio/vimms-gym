@@ -1,5 +1,6 @@
 import os
 import sys
+import random as ra
 
 import pandas as pd
 
@@ -7,6 +8,7 @@ sys.path.append('..')
 
 import streamlit as st
 import torch as th
+
 import numpy as np
 from stable_baselines3 import PPO, DQN
 
@@ -20,8 +22,8 @@ METHOD_DQN_COV = 'DQN (Coverage)'
 METHOD_DQN_INT = 'DQN (Intensity)'
 
 
-class Trajectory(): # object to store trajectory
-    def __init__(self, importance, max_Q, min_Q):
+class Trajectory(): # object to store trajectory. Modified by Ziyan
+    def __init__(self, importance, max_Q, min_Q, timestep):
         self.importance = importance
         self.states = []
         self.actions = []
@@ -31,6 +33,8 @@ class Trajectory(): # object to store trajectory
         self.flag = False
         self.maxq = max_Q
         self.minq = min_Q
+        self.each_I = []
+        self.timestep = timestep
 
     def add_pairs(self, pairs: list):
         for pair in pairs:
@@ -39,24 +43,28 @@ class Trajectory(): # object to store trajectory
             self.rewards.append(pair[2])
             self.timesteps.append(pair[3])
             self.scan_id.append(pair[4])
+            self.each_I.append(pair[5])
         self.flag = True
 
     def get_df(self, max_peaks, feature_name):
-        df = pd.DataFrame({'timestep': self.timesteps, 'action': self.actions, 'reward': self.rewards,
-                           'scan_id': self.scan_id})
+        df = pd.DataFrame({'scan_id': self.scan_id[1:len(self.scan_id)],
+                           'importance': self.each_I[0:len(self.each_I)-1],
+                           'timestep': self.timesteps[0:len(self.timesteps)-1],
+                           'action': self.actions[0:len(self.actions)-1],
+                           'reward': self.rewards[0:len(self.rewards)-1]})
         for name in feature_name:
             feature_vector = []
-            for i in range(len(self.actions)):
+            for i in range(len(self.actions)-1):
                 if self.actions[i] == max_peaks:
-                    feature_vector.append('None')
+                    feature_vector.append(None)
                 elif self.actions[i] != max_peaks:
-                    feature_vector.append(self.states[i][name][self.actions[i]])
-            df.insert(loc=3, column=name, value=feature_vector)
+                    feature_vector.append(self.states[i+1][name][self.actions[i]])
+            df.insert(loc=5, column=name, value=feature_vector)
 
         return df
 
 
-class PriorityQueue(): # Modified according to the template on the Internet
+class PriorityQueue(): # Modified by Ziyan according to the template on the Internet
     def __init__(self):
         self.length = 0
         self.items = []
@@ -146,11 +154,15 @@ def load_model_and_params(preset, method, params):
 def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params, budget, t_length, statesAfter, intervalSize):
     if method in [METHOD_DQN_COV, METHOD_DQN_INT]:
         method = METHOD_DQN
-
+    if method == METHOD_DQN:
+        random_states = ra.sample(range(0, 1000), budget)
     T = PriorityQueue()
+    random = PriorityQueue()
     t = []
     c = 0
     i = 0
+    random_c = 100
+    random_i = 0
     env = DDAEnv(max_peaks, params)
     obs = env.reset(chems=chems)
     done = False
@@ -171,31 +183,45 @@ def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params
             if obs is not None:
                 episode.add_step_data(action, action_probs, obs, reward, info)
                 if method == METHOD_DQN:
-                    # using HIGHLIGHT
-                    if len(t) == t_length:
-                        del (t[0])
-                    t.append([obs, int(action), round(reward, 4), episode.num_steps, info['current_scan_id']])
-                    if c > 0:
-                        c -= 1
-
+                    # using HIGHLIGHT. Modified by Ziyan
                     with th.no_grad():
                         obs_tensor, _ = model.q_net.obs_to_tensor(obs)
                         q_values = model.q_net(obs_tensor)
                         max_Q = round(float(max(q_values[0])), 4)
                         min_Q = round(float(min(q_values[0])), 4)
                         importance = round(max_Q - min_Q, 4)
+                    if len(t) == t_length+1:
+                        del (t[0])
+                    t.append([obs, int(action), round(reward, 4), episode.num_steps, info['current_scan_id'], importance])
+                    if c > 0:
+                        c -= 1
+                    if random_c > 0 and random_c != 100:
+                        random_c -= 1
                     if intervalSize - c == statesAfter:
                         T.items[T.indexes.index(i)].add_pairs(t)
+
+                    if random_c == 0:
+                        random_c = 100
+                        random.items[random.indexes.index(random_i)].add_pairs(t)
+
 
                     if T.length < budget or importance > T.get_min_I():
                         if c == 0:
                             if T.length == budget:
                                 T.pop()
                             i += 1
-                            tra = Trajectory(importance, max_Q, min_Q)
+                            tra = Trajectory(importance, max_Q, min_Q, episode.num_steps)
                             T.insert(tra, importance, i, budget)
                             T.order()
                             c = intervalSize
+                    # extract random trajectory
+                    if episode.num_steps in random_states:
+                        random_i += 1
+                        random_tra = Trajectory(importance, max_Q, min_Q, episode.num_steps)
+                        random.insert(random_tra, importance, random_i, budget)
+                        random.order()
+                        random_c = statesAfter
+
 
             if episode.num_steps % 500 == 0:
                 st.write('Step\t', episode.num_steps, '\tTotal reward\t',
@@ -209,13 +235,15 @@ def run_simulation(N, chems, max_peaks, method, min_ms1_intensity, model, params
                 if method == METHOD_DQN:
                     if not T.items[T.indexes.index(i)].flag:
                         T.items[T.indexes.index(i)].add_pairs(t)
+                    if not random.items[random.indexes.index(random_i)].flag:
+                        random.items[random.indexes.index(random_i)].add_pairs(t)
 
                 # store scan information
                 vimms_env = env.vimms_env
                 episode.scans = vimms_env.controller.scans
 
                 break
-    return episode, env, T
+    return episode, env, T, random
 
 
 def scan_id_to_scan(scans, scan_id):
