@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 from vimms.Evaluation import evaluate_simulated_env, EvaluationData
 
-from vimms_gym.common import METHOD_RANDOM, METHOD_FULLSCAN, METHOD_TOPN, METHOD_PPO, METHOD_DQN
+from vimms_gym.common import METHOD_RANDOM, METHOD_FULLSCAN, METHOD_TOPN, METHOD_PPO, METHOD_DQN, GYM_NUM_ENV
 from vimms_gym.env import DDAEnv
 from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, get_ppo_action_probs, \
     get_dqn_q_values
@@ -172,19 +172,22 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
         env = DDAEnv(max_peaks, env_params)
         obs = env.reset(chems=chems)
+        states = None
         done = False
 
         # lists to store episodic results
         episode = Episode(obs)
+        episode_starts = np.ones((GYM_NUM_ENV,), dtype=bool)        
         while not done:  # repeat until episode is done
 
             # select an action depending on the observation and method
-            action, action_probs = pick_action(
-                method, obs, model, env.features, N, min_ms1_intensity)
+            action, action_probs, states = pick_action(
+                method, obs, model, env.features, N, min_ms1_intensity, states=states, episode_starts=episode_starts)
 
             # make one step through the simulation
             obs, reward, done, info = env.step(action)
-
+            episode_starts = dones
+            
             # store new episodic information
             if obs is not None:
                 episode.add_step_data(action, action_probs, obs, reward, info)
@@ -215,13 +218,14 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
     return all_episodic_results
 
 
-def pick_action(method, obs, model, features, N, min_ms1_intensity):
+def pick_action(method, obs, model, features, N, min_ms1_intensity, states=None, episode_starts=None):
     action_probs = []
 
-    if METHOD_DQN in method:
-        method = METHOD_DQN
-    elif METHOD_PPO in method:
-        method = METHOD_PPO
+    if method != METHOD_PPO_RECURRENT:
+        if METHOD_DQN in method:
+            method = METHOD_DQN
+        elif METHOD_PPO in method:
+            method = METHOD_PPO
 
     if method == METHOD_RANDOM:
         action = random_policy(obs)
@@ -230,11 +234,14 @@ def pick_action(method, obs, model, features, N, min_ms1_intensity):
     elif method == METHOD_TOPN:
         action = topN_policy(obs, features, N, min_ms1_intensity)
     elif method == METHOD_PPO:
-        action, _states = model.predict(obs, deterministic=True)
+        action, states = model.predict(obs, deterministic=True)
         action_probs = get_ppo_action_probs(model, obs)
+    elif method == METHOD_PPO_RECURRENT:
+        action, states = model.predict(obs, deterministic=True, state=states, episode_start=episode_starts)
+        action_probs = get_ppo_action_probs(model, obs)        
     elif method == METHOD_DQN:
-        action, _states = model.predict(obs, deterministic=True)
+        action, states = model.predict(obs, deterministic=True)
         q_values = get_dqn_q_values(model, obs)
         action_probs = q_values # not really ....
 
-    return action, action_probs
+    return action, action_probs, states

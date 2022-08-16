@@ -1,8 +1,8 @@
 import argparse
 import os
-import socket
 import sys
 import uuid
+import socket
 from pprint import pprint
 
 from loguru import logger
@@ -19,6 +19,7 @@ from optuna.samplers import TPESampler
 import torch
 
 from stable_baselines3 import PPO, DQN
+from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.utils import set_random_seed
@@ -32,17 +33,9 @@ from experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM
 
 from vimms.Common import create_if_not_exist
 from vimms_gym.env import DDAEnv
-from vimms_gym.common import METHOD_PPO, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
+from vimms_gym.common import METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
     EVAL_METRIC_F1, EVAL_METRIC_COVERAGE_PROP, EVAL_METRIC_INTENSITY_PROP, \
-    EVAL_METRIC_MS1_MS2_RATIO, EVAL_METRIC_EFFICIENCY
-
-GYM_ENV_NAME = 'DDAEnv'
-if socket.gethostname() == 'Macbook-Air.local':
-    GYM_NUM_ENV = 1
-    USE_SUBPROC = False
-else:
-    GYM_NUM_ENV = 20
-    USE_SUBPROC = True
+    EVAL_METRIC_MS1_MS2_RATIO, EVAL_METRIC_EFFICIENCY, GYM_ENV_NAME, GYM_NUM_ENV, USE_SUBPROC
 
 TRAINING_CHECKPOINT_FREQ = 10E6
 TRAINING_CHECKPOINT_FREQ = max(TRAINING_CHECKPOINT_FREQ // GYM_NUM_ENV, 1)
@@ -53,7 +46,6 @@ N_EVAL_EPISODES = 30
 
 
 def train(model_name, timesteps, params, max_peaks, out_dir, verbose=0):
-    assert model_name in [METHOD_PPO, METHOD_DQN]
     set_torch_threads()
 
     model_params = params['model']
@@ -71,8 +63,7 @@ def train(model_name, timesteps, params, max_peaks, out_dir, verbose=0):
 
 def tune(model_name, timesteps, params, max_peaks, out_dir,
          n_trials, n_eval_episodes, eval_freq, eval_metric, tune_model,
-         tune_reward, n_startup_trials=0, verbose=0):
-    assert model_name in [METHOD_PPO, METHOD_DQN]
+         tune_reward, n_startup_trials=5, verbose=0):
     set_torch_threads()
 
     sampler = TPESampler(n_startup_trials=n_startup_trials)
@@ -82,6 +73,7 @@ def tune(model_name, timesteps, params, max_peaks, out_dir,
     logger.info(
         f"Doing {int(n_evaluations)} intermediate evaluations for pruning based on the number of timesteps."
         f" (1 evaluation every {int(eval_freq)} timesteps)"
+        f" after {n_startup_trials} startup trials"
     )
 
     # Add stream handler of stdout to show the messages
@@ -141,6 +133,8 @@ class Objective(object):
     def __call__(self, trial):
         # Sample parameters
         if self.model_name == METHOD_PPO:
+            sampled_params = sample_ppo_params(trial, self.tune_model, self.tune_reward)
+        elif self.model_name == METHOD_PPO_RECURRENT:
             sampled_params = sample_ppo_params(trial, self.tune_model, self.tune_reward)
         elif self.model_name == METHOD_DQN:
             sampled_params = sample_dqn_params(trial, self.tune_model, self.tune_reward)
@@ -221,6 +215,9 @@ def init_model(model_name, model_params, env, out_dir=None, verbose=0):
     if model_name == METHOD_PPO:
         model = PPO('MultiInputPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
                     **model_params)
+    elif model_name == METHOD_PPO_RECURRENT:
+        model = RecurrentPPO('MultiInputLstmPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
+                    **model_params)        
     elif model_name == METHOD_DQN:
         model = DQN('MultiInputPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
                     **model_params)

@@ -1,6 +1,6 @@
 cd ..
 pip install streamlit loguru vimms stable-baselines3 optuna plotly kaleido cloudpickle==2.1.0
-pip install git+https://github.com/DLR-RM/stable-baselines3
+pip install git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib
 apt-get install -y htop
 
 # cd /notebooks/bin

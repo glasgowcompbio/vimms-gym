@@ -1,5 +1,6 @@
 import numpy as np
 import pylab as plt
+import socket
 
 MS1_REWARD = 0.1
 INVALID_MOVE_REWARD = -1.0
@@ -13,10 +14,19 @@ METHOD_RANDOM = 'random'
 METHOD_FULLSCAN = 'fullscan'
 METHOD_TOPN = 'topN'
 METHOD_PPO = 'PPO'
+METHOD_PPO_RECURRENT = 'RecurrentPPO'
 METHOD_DQN = 'DQN'
 METHOD_DQN_COV = 'DQN_COV'
 METHOD_DQN_INT = 'DQN_INT'
 METHOD_DQN_MID = 'DQN_MID'
+
+GYM_ENV_NAME = 'DDAEnv'
+if socket.gethostname() == 'Macbook-Air.local':
+    GYM_NUM_ENV = 1
+    USE_SUBPROC = False
+else:
+    GYM_NUM_ENV = 20
+    USE_SUBPROC = True
 
 RENDER_HUMAN = 'human'
 RENDER_RGB_ARRAY = 'rgb_array'
