@@ -77,7 +77,7 @@ def get_ppo_action_probs(model, state):
     obs = model.policy.obs_to_tensor(state)[0]
     dis = model.policy.get_distribution(obs)
     probs = dis.distribution.probs
-    probs_np = probs.detach().numpy()
+    probs_np = probs.detach().cpu().numpy()
     return probs_np
 
 
