@@ -4,12 +4,12 @@ This project aims to try to help user understand vimms-gym models through a visu
 
 ## Install vimms-gym
 
-To use this app, you need to install vimms-gym first. Currently, vimms-gym is not in the form of package and is in the development stage. Please clone the contents of the entire branch repository first.
+To use this app, you need to install vimms-gym first. Currently, vimms-gym is not in the form of package and is in the development stage. Please clone the contents of the entire viewer branch repository first.
 
 ***install dependencies through Anaconda***
 
 1. Install Anaconda (https://www.anaconda.com/products/individual).
-2. Cloned the whole repository.
+2. Cloned the the viewer branch.
 3. Go to the location of the clone repository in the terminal and run `$ conda env create --file environment.yml` to create a new virtual environment of vimms-gym.
 
 ## Usage
@@ -19,5 +19,10 @@ To use this app, you need to install vimms-gym first. Currently, vimms-gym is no
 3. Go into viewer folder by typing `$ cd viewer`
 2. Run the app by typing `$ streamlit run myviewer.py`.
 
+## Files
 
+1. **myviewer.py**: the main file of the app. This file finishes all the functions of app. The contents of the documents are all completed by Ziyan.
+2. **viewer_helper.py**: help codes for running simulation. Functions such as get_parameters(), load_model_and_params(), scan_id_to_scan() and part of run_simulation() are provided by Joe Wandy. Trajectory() object, PriorityQueue() object and HIGHLIGHTS algorithm in run_simulation() are copmleted by Ziyan.
+3. **experiments.py**: parameters of three preset environments for beer samples. This file helps to finish the function of extract and store the simulated chemicals. The whole file are provided by Joe Wandy.
+4. **.p files**: data of simulated chemicals extracted in 3.
 
