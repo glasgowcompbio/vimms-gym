@@ -306,12 +306,10 @@ if __name__ == '__main__':
     if args.tune_reward:
         alpha = None
         beta = None
-        out_dir = os.path.abspath(os.path.join(args.results, 'results', args.model))
     else:
         alpha = args.alpha
         beta = args.beta
-        out_dir = os.path.abspath(
-            os.path.join(args.results, 'results_alpha_%.2f_beta_%.2f' % (alpha, beta), args.model))
+    out_dir = os.path.abspath(os.path.join(args.results, args.model))
     create_if_not_exist(out_dir)
 
     # choose one preset and generate parameters for it
