@@ -138,4 +138,3 @@ samplers_QC*.p
 notebooks/*/evaluation_*
 notebooks/QCB_resimulated_medium/evaluation
 notebooks/QCB_resimulated_medium/optimise_baselines
-tune/

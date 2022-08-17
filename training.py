@@ -63,17 +63,15 @@ def train(model_name, timesteps, params, max_peaks, out_dir, verbose=0):
 
 def tune(model_name, timesteps, params, max_peaks, out_dir,
          n_trials, n_eval_episodes, eval_freq, eval_metric, tune_model,
-         tune_reward, n_startup_trials=5, verbose=0):
+         tune_reward, n_startup_trials=0, verbose=0):
     set_torch_threads()
 
-    sampler = TPESampler(n_startup_trials=n_startup_trials)
     # Do not prune before 1/3 of the max budget is used
     n_evaluations = max(1, timesteps // int(eval_freq))
     pruner = MedianPruner(n_startup_trials=n_startup_trials, n_warmup_steps=n_evaluations // 3)
     logger.info(
         f"Doing {int(n_evaluations)} intermediate evaluations for pruning based on the number of timesteps."
         f" (1 evaluation every {int(eval_freq)} timesteps)"
-        f" after {n_startup_trials} startup trials"
     )
 
     # Add stream handler of stdout to show the messages
@@ -265,6 +263,7 @@ if __name__ == '__main__':
     # model parameters
     parser.add_argument('--model', choices=[
         METHOD_PPO,
+        METHOD_PPO_RECURRENT,
         METHOD_DQN
     ], required=True, type=str, help='Specify model name')
     parser.add_argument('--timesteps', required=True, type=float, help='Training timesteps')
