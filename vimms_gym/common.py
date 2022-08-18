@@ -25,7 +25,7 @@ if socket.gethostname() == 'Macbook-Air.local':
     GYM_NUM_ENV = 1
     USE_SUBPROC = False
 else:
-    GYM_NUM_ENV = 40
+    GYM_NUM_ENV = 20
     USE_SUBPROC = True
 
 RENDER_HUMAN = 'human'

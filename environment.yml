@@ -1,6 +1,5 @@
 name: vimms-gym
 channels:
-  - conda-forge
   - defaults
 dependencies:
   - numpy
@@ -13,13 +12,15 @@ dependencies:
   - jupyterlab
   - ipywidgets
   - pytorch
-  - gym
   - streamlit
   - pip
   - pip:
     - vimms
     - stable-baselines3
+    - gym
     - tensorboard
     - optuna
     - plotly
     - kaleido
+    - cloudpickle==2.1.0
+    - git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib.git
