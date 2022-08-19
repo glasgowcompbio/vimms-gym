@@ -81,6 +81,14 @@ def get_ppo_action_probs(model, state):
     return probs_np
 
 
+def get_recurrent_ppo_action_probs(model, state, lstm_states, episode_starts):
+    obs = model.policy.obs_to_tensor(state)[0]
+    dis = model.policy.get_distribution(obs, lstm_states, episode_starts)
+    probs = dis.distribution.probs
+    probs_np = probs.detach().cpu().numpy()
+    return probs_np
+
+
 def get_ppo_best_valid_action(model, observation):
     valid_actions = observation['valid_actions']
     action_probs = get_ppo_action_probs(model, observation)

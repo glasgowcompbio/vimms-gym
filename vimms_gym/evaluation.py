@@ -4,7 +4,7 @@ from vimms.Evaluation import evaluate_simulated_env, EvaluationData
 
 from vimms_gym.common import METHOD_RANDOM, METHOD_FULLSCAN, METHOD_TOPN, METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, GYM_NUM_ENV
 from vimms_gym.env import DDAEnv
-from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, get_ppo_action_probs, \
+from vimms_gym.policy import get_recurrent_ppo_action_probs, random_policy, fullscan_policy, topN_policy, get_ppo_action_probs, \
     get_dqn_q_values
 
 
@@ -40,6 +40,7 @@ class Episode():
         vimms_env = env.vimms_env
         self.eval_data = EvaluationData(vimms_env)
         self.eval_res = evaluate(vimms_env, intensity_threshold)
+        self.eval_res['total_rewards'] = sum(self.rewards)
         return self.eval_res
 
     def get_total_rewards(self):
@@ -177,7 +178,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
         # lists to store episodic results
         episode = Episode(obs)
-        episode_starts = np.ones((GYM_NUM_ENV,), dtype=bool)        
+        episode_starts = np.ones((1,), dtype=bool)        
         while not done:  # repeat until episode is done
 
             # select an action depending on the observation and method
@@ -238,7 +239,8 @@ def pick_action(method, obs, model, features, N, min_ms1_intensity, states=None,
         action_probs = get_ppo_action_probs(model, obs)
     elif method == METHOD_PPO_RECURRENT:
         action, states = model.predict(obs, deterministic=True, state=states, episode_start=episode_starts)
-        action_probs = get_ppo_action_probs(model, obs)        
+        # FIXME: this is not working yet
+        # action_probs = get_recurrent_ppo_action_probs(model, obs, states, episode_starts)        
     elif method == METHOD_DQN:
         action, states = model.predict(obs, deterministic=True)
         q_values = get_dqn_q_values(model, obs)
