@@ -8,7 +8,7 @@ from vimms.ChemicalSamplers import MZMLFormulaSampler, MZMLRTandIntensitySampler
 from vimms.Common import POSITIVE, load_obj, save_obj
 from vimms.Roi import RoiBuilderParams
 
-from vimms_gym.common import linear_schedule, METHOD_DQN, METHOD_PPO, ALPHA, BETA
+from vimms_gym.common import is_interactive, linear_schedule, METHOD_DQN, METHOD_PPO, ALPHA, BETA
 
 ENV_QCB_SMALL_GAUSSIAN = 'QCB_chems_small'
 ENV_QCB_MEDIUM_GAUSSIAN = 'QCB_chems_medium'
@@ -21,7 +21,7 @@ ENV_QCB_LARGE_EXTRACTED = 'QCB_resimulated_large'
 
 def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
     max_peaks = 100
-    mzml_filename = os.path.abspath(os.path.join('', 'notebooks', 'fullscan_QCB.mzML'))
+    mzml_filename = 'fullscan_QCB.mzML'
     samplers_pickle_prefix = 'samplers_QCB_small'
     n_chemicals = (20, 50)
     mz_range = (100, 110)
@@ -79,7 +79,7 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
 def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
     max_peaks = 200
-    mzml_filename = os.path.abspath(os.path.join('', 'notebooks', 'fullscan_QCB.mzML'))
+    mzml_filename = 'fullscan_QCB.mzML'
     samplers_pickle_prefix = 'samplers_QCB_medium'
     n_chemicals = (200, 500)
     mz_range = (100, 600)
@@ -137,7 +137,7 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
 
 def preset_qcb_large(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
     max_peaks = 200
-    mzml_filename = os.path.abspath(os.path.join('', 'notebooks', 'fullscan_QCB.mzML'))
+    mzml_filename = 'fullscan_QCB.mzML'
     samplers_pickle_prefix = 'samplers_QCB_large'
     n_chemicals = (2000, 5000)
     mz_range = (70, 1000)
@@ -183,8 +183,12 @@ def generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals, mz_range
                     enable_spike_noise=True, noise_density=0.1, noise_max_val=1E3,
                     min_roi_length=3, at_least_one_point_above=5E5):
     samplers_pickle_suffix = 'extracted' if extract_chromatograms else 'gaussian'
-    samplers_pickle = os.path.abspath(os.path.join(
+
+    base_dir = '../..' if is_interactive() else '.'
+    mzml_filename = os.path.abspath(os.path.join(base_dir, 'notebooks', 'fullscan_QCB.mzML'))
+    samplers_pickle = os.path.abspath(os.path.join(base_dir,
         'pickles', '%s_%s.p' % (samplers_pickle_prefix, samplers_pickle_suffix)))
+
     min_mz = mz_range[0]
     max_mz = mz_range[1]
     min_rt = rt_range[0]

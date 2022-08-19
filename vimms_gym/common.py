@@ -38,6 +38,7 @@ EVAL_METRIC_INTENSITY_PROP = 'intensity_prop'
 EVAL_METRIC_MS1_MS2_RATIO = 'ms1ms2_ratio'
 EVAL_METRIC_EFFICIENCY = 'efficiency'
 
+
 def clip_value(value, max_value, min_range=0.0, max_range=1.0):
     '''
     Scale value by max_value, then clip it to [-min_range, max_range]
@@ -76,3 +77,8 @@ def linear_schedule(initial_value, min_value=0.0):
         return max(progress_remaining * initial_value, min_value)
 
     return func
+
+
+def is_interactive():
+    import __main__ as main
+    return not hasattr(main, '__file__')
