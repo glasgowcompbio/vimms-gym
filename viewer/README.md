@@ -8,16 +8,17 @@ To use this app, you need to install vimms-gym first. Currently, vimms-gym is no
 
 ***install dependencies through Anaconda***
 
-1. Install Anaconda (https://www.anaconda.com/products/individual).
-2. Cloned the the viewer branch.
-3. Go to the location of the clone repository in the terminal and run `$ conda env create --file environment.yml` to create a new virtual environment of vimms-gym.
+1. Install Anaconda (https://www.anaconda.com/products/individual). If you are using windows, please select the `Add Anaconda to my PATH environment variable` in `Advance Options`.
+2. Clone the the viewer branch.
+3. Go to the location of the cloned repository in the terminal and run `$ conda env create --file environment.yml` to create a new virtual environment of vimms-gym. This may take a while.
 
 ## Usage
 
 1. Go into the virtual environment of vimms-gym by typing `$ conda activate vimms-gym` in terminal.
 2. Go into the cloned repository through terminal.
-3. Go into viewer folder by typing `$ cd viewer`
-2. Run the app by typing `$ streamlit run myviewer.py`.
+3. Go into viewer folder by typing `$ cd viewer`.
+4. Run the app by typing `$ streamlit run myviewer.py`.
+5. In the app, please generate chemical first. Each policy can only run once for each generated chemical set. If you want test more please generate new chemical set.
 
 ## Files
 
