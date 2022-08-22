@@ -115,14 +115,16 @@ def evaluate(env, intensity_threshold=0.5, format_output=True):
     recalculated_coverage_prop = (TP+FP)/(TP+FP+FN)
     recalculated_intensity_prop = np.mean(total_frag_intensities)
 
-    print('recalculated_coverage_prop', recalculated_coverage_prop, 
-        'evaluated_coverage_prop', vimms_env_res['coverage_proportion'][0])
+    # print('recalculated_coverage_prop', recalculated_coverage_prop, 
+    #     'evaluated_coverage_prop', vimms_env_res['coverage_proportion'][0])
 
-    print('recalculated_intensity_prop', recalculated_intensity_prop, 
-        'evaluated_intensity_prop', vimms_env_res['intensity_proportion'][0])
+    # print('recalculated_intensity_prop', recalculated_intensity_prop, 
+    #     'evaluated_intensity_prop', vimms_env_res['intensity_proportion'][0])
 
-    coverage_prop = recalculated_coverage_prop
-    intensity_prop = recalculated_intensity_prop
+    # coverage_prop = recalculated_coverage_prop
+    # intensity_prop = recalculated_intensity_prop
+    coverage_prop = vimms_env_res['coverage_proportion'][0]
+    intensity_prop = vimms_env_res['intensity_proportion'][0]
 
     # compute precision, recall, f1
     try:
