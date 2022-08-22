@@ -97,15 +97,32 @@ def evaluate(env, intensity_threshold=0.5, format_output=True):
     TP = 0  # chemicals hit correctly (above threshold)
     FP = 0  # chemicals hit incorrectly (below threshold)
     FN = 0  # chemicals not hit
+    total_frag_intensities = []
     for chem in fragmented_intensities:
         frag_int = fragmented_intensities[chem]
+        max_intensity = chem.max_intensity
         if frag_int > 0:  # chemical was fragmented ...
-            if fragmented_intensities[chem] > (intensity_threshold * chem.max_intensity):
+            if fragmented_intensities[chem] > (intensity_threshold * max_intensity):
                 TP += 1  # above threshold
             else:
                 FP += 1  # below threshold
         else:
             FN += 1  # chemical was not fragmented
+        total_frag_intensities.append(frag_int/max_intensity)
+
+    assert (TP+FP+FN) == len(all_chems)
+    assert len(total_frag_intensities) == len(all_chems)
+    recalculated_coverage_prop = (TP+FP)/(TP+FP+FN)
+    recalculated_intensity_prop = np.mean(total_frag_intensities)
+
+    print('recalculated_coverage_prop', recalculated_coverage_prop, 
+        'evaluated_coverage_prop', vimms_env_res['coverage_proportion'][0])
+
+    print('recalculated_intensity_prop', recalculated_intensity_prop, 
+        'evaluated_intensity_prop', vimms_env_res['intensity_proportion'][0])
+
+    coverage_prop = recalculated_coverage_prop
+    intensity_prop = recalculated_intensity_prop
 
     # compute precision, recall, f1
     try:
@@ -125,8 +142,8 @@ def evaluate(env, intensity_threshold=0.5, format_output=True):
 
     if format_output:
         eval_res = {
-            'coverage_prop': '%.3f' % vimms_env_res['coverage_proportion'][0],
-            'intensity_prop': '%.3f' % vimms_env_res['intensity_proportion'][0],
+            'coverage_prop': '%.3f' % coverage_prop,
+            'intensity_prop': '%.3f' % intensity_prop,
             'ms1ms2_ratio': '%.3f' % ms1_ms2_ratio,
             'efficiency': '%.3f' % efficiency,
             'TP': '%d' % TP,
@@ -138,8 +155,8 @@ def evaluate(env, intensity_threshold=0.5, format_output=True):
         }
     else:
         eval_res = {
-            'coverage_prop': vimms_env_res['coverage_proportion'][0],
-            'intensity_prop': vimms_env_res['intensity_proportion'][0],
+            'coverage_prop': coverage_prop,
+            'intensity_prop': intensity_prop,
             'ms1/ms1ms2_ratio': ms1_ms2_ratio,
             'efficiency': efficiency,
             'TP': TP,
