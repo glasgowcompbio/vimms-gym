@@ -161,7 +161,7 @@ class Objective(object):
 
         # Create env used for evaluation
         # eval_env = make_environment(self.max_peaks, self.params)
-        print('Creating evaluation environment with params', self.params)
+        # print('Creating evaluation environment with params', self.params)
         eval_env = DDAEnv(self.max_peaks, self.params)
         eval_env = Monitor(eval_env)
 
