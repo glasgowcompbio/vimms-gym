@@ -226,7 +226,7 @@ def init_model(model_name, model_params, env, out_dir=None, verbose=0):
 def set_torch_threads():
     torch_threads = 1  # Set pytorch num threads to 1 for faster training
     if socket.gethostname() == 'cauchy':  # except on cauchy where we have no gpu, only cpu
-        torch_threads = 60
+        torch_threads = 40
     torch.set_num_threads(torch_threads)
 
 
