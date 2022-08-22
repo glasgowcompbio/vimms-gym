@@ -34,18 +34,34 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
     params['env']['beta'] = beta
 
     if model_name == METHOD_DQN:
-        gamma = 0.98
-        learning_rate = 0.000264967
-        batch_size = 512
-        buffer_size = 1000000
-        train_freq = 16
-        subsample_steps = 1
+
+        # gamma = 0.98
+        # learning_rate = 0.000264967
+        # batch_size = 512
+        # buffer_size = 1000000
+        # train_freq = 16
+        # subsample_steps = 1
+        # gradient_steps = max(train_freq // subsample_steps, 1)
+        # exploration_fraction = 0.282560492
+        # exploration_final_eps = 0.057327231
+        # target_update_interval = 15000
+        # learning_starts = 0
+        # hidden_nodes = 512
+
+        # bad parameters for debugging
+        gamma = 0.95
+        learning_rate = 0.231964597
+        batch_size = 64
+        buffer_size = 50000
+        train_freq = 8
+        subsample_steps = 8
         gradient_steps = max(train_freq // subsample_steps, 1)
-        exploration_fraction = 0.282560492
-        exploration_final_eps = 0.057327231
+        exploration_fraction = 0.113672411
+        exploration_final_eps = 0.193254046
         target_update_interval = 15000
-        learning_starts = 0
-        hidden_nodes = 512
+        learning_starts = 10000
+        hidden_nodes = 256
+
         policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {
             'gamma': gamma,
