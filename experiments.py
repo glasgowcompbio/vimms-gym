@@ -64,18 +64,18 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
         # hidden_nodes = 256
 
         # DQN_24: best on optimising reward but need more timesteps (now 200K)
-        gamma = 0.98
-        learning_rate = 0.000608383
-        batch_size = 512
-        buffer_size = 100000
-        train_freq = 256
-        subsample_steps = 2
-        gradient_steps = max(train_freq // subsample_steps, 1)
-        exploration_fraction = 0.213530912
-        exploration_final_eps = 0.053157309
-        target_update_interval = 20000
-        learning_starts = 0
-        hidden_nodes = 512
+        # gamma = 0.98
+        # learning_rate = 0.000608383
+        # batch_size = 512
+        # buffer_size = 100000
+        # train_freq = 256
+        # subsample_steps = 2
+        # gradient_steps = max(train_freq // subsample_steps, 1)
+        # exploration_fraction = 0.213530912
+        # exploration_final_eps = 0.053157309
+        # target_update_interval = 20000
+        # learning_starts = 0
+        # hidden_nodes = 512
 
         # DQN_9: best on optimising F1 (500K timesteps), but can't reproduce the results during testing
         gamma = 0.95
