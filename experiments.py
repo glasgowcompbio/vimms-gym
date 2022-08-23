@@ -49,7 +49,7 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
         # learning_starts = 0
         # hidden_nodes = 512
 
-        # bad_1: stuck on producing MS1 scans only
+        # DQN_4: optimising reward -- stuck on producing MS1 scans only
         # gamma = 0.95
         # learning_rate = 0.231964597
         # batch_size = 64
@@ -63,7 +63,7 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
         # learning_starts = 10000
         # hidden_nodes = 256
 
-        # bad_2: test reward lower than train reward
+        # DQN_24: best on optimising reward but need more timesteps (now 200K)
         gamma = 0.98
         learning_rate = 0.000608383
         batch_size = 512
@@ -76,6 +76,20 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
         target_update_interval = 20000
         learning_starts = 0
         hidden_nodes = 512
+
+        # DQN_9: best on optimising F1 (500K timesteps), but can't reproduce the results during testing
+        gamma = 0.95
+        learning_rate = 0.001138298
+        batch_size = 32
+        buffer_size = 1000000
+        train_freq = 128
+        subsample_steps = 2
+        gradient_steps = max(train_freq // subsample_steps, 1)
+        exploration_fraction = 0.403751466
+        exploration_final_eps = 0.189805909
+        target_update_interval = 15000
+        learning_starts = 0
+        hidden_nodes = 256
 
         policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {

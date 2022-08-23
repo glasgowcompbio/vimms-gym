@@ -45,7 +45,7 @@ N_TRIALS = 100
 N_EVAL_EPISODES = 30
 
 
-def train(model_name, timesteps, params, max_peaks, out_dir, verbose=0):
+def train(model_name, timesteps, params, max_peaks, out_dir, out_file, verbose=0):
     set_torch_threads()
 
     model_params = params['model']
@@ -57,7 +57,10 @@ def train(model_name, timesteps, params, max_peaks, out_dir, verbose=0):
         name_prefix='%s_checkpoint' % model_name)
     log_interval = 1 if verbose == 2 else 4
     model.learn(total_timesteps=timesteps, callback=checkpoint_callback, log_interval=log_interval)
-    fname = '%s/%s_%s.zip' % (out_dir, GYM_ENV_NAME, model_name)
+    
+    if out_file is None:
+        out_file = '%s_%s.zip' % (GYM_ENV_NAME, model_name)
+    fname = os.path.join(out_dir, out_file)
     model.save(fname)
 
 
@@ -258,6 +261,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--results', default=os.path.abspath('notebooks'), type=str,
                         help='Base location to store results')
+    parser.add_argument('--out_file', default=None, type=str,
+                        help='Output model filename. If None, a default name will be used.')
     parser.add_argument('--verbose', default=0, type=int,
                         help='Verbosity level')
 
@@ -330,7 +335,8 @@ if __name__ == '__main__':
     # actually train the model here
     if args.tune_model or args.tune_reward:
         tune(model_name, args.timesteps, params, max_peaks, out_dir, args.n_trials,
-             args.n_eval_episodes, int(args.eval_freq), args.eval_metric,
-             args.tune_model, args.tune_reward, verbose=args.verbose)
+            args.n_eval_episodes, int(args.eval_freq), args.eval_metric,
+            args.tune_model, args.tune_reward, verbose=args.verbose)
     else:
-        train(model_name, args.timesteps, params, max_peaks, out_dir, verbose=args.verbose)
+        train(model_name, args.timesteps, params, max_peaks, out_dir, args.out_file, 
+            verbose=args.verbose)
