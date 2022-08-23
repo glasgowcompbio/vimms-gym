@@ -18,7 +18,7 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, INVALID_MOVE_REWARD, \
     MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
-    RENDER_RGB_ARRAY, render_scan, ALPHA, BETA
+    RENDER_RGB_ARRAY, render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -35,8 +35,6 @@ class DDAEnv(gym.Env):
         self.in_dim = self.max_peaks + 1  # 0 is for MS1
         self.action_space = self._get_action_space()
         self.observation_space = self._get_observation_space()
-        self.features = []
-        self.step_no = 0
 
         self.chemical_creator_params = params['chemical_creator']
         self.noise_params = params['noise']
@@ -378,6 +376,8 @@ class DDAEnv(gym.Env):
         if self.vimms_env is not None:
             self.vimms_env.close_progress_bar()
 
+        self.features = []
+        self.step_no = 0
         self.chems = []
         self.current_scan = None
         self.state = self._initial_state()
@@ -387,6 +387,8 @@ class DDAEnv(gym.Env):
 
         self.elapsed_scans_since_start = 0
         self.elapsed_scans_since_last_ms1 = 0
+        self.ms1_count = 0
+        self.ms2_count = 0
 
         # track regions of interest
         smartroi_params = SmartRoiParams()
@@ -422,11 +424,18 @@ class DDAEnv(gym.Env):
             self.last_reward = self._compute_reward(next_scan, dda_action, is_valid)
             if next_scan.ms_level == 1:
                 self.last_ms1_scan = next_scan
+                self.ms1_count += 1
+            else:
+                self.ms2_count += 1
             self.current_scan = next_scan
         else:
             self.state = None
-            self.last_reward = 0
             self.current_scan = None
+            self.last_reward = 0
+
+            # penalise if no MS2 events have been performed
+            if self.ms1_count > 0 and self.ms2_count == 0:
+                self.last_reward = NO_FRAGMENTATION_REWARD
 
         return self.state, self.last_reward, self.episode_done, info
 
