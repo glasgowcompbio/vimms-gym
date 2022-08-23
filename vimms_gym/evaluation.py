@@ -81,18 +81,17 @@ def evaluate(env, intensity_threshold=0.5, format_output=True):
         frag_events = ms2_scan.fragevent
         if frag_events is not None:  # if a chemical has been fragmented ...
 
-            # get the frag event for this scan
-            # TODO: assume only 1 chemical has been fragmented
-            # works for DDA but not for DIA
-            event = frag_events[0]
+            # get the frag events for this scan
+            # there would be one frag event for each chemical fragmented in this MS2 scan
+            for event in frag_events:
 
-            # get the base chemical that was fragmented
-            base_chem = event.chem.get_original_parent()
+                # get the base chemical that was fragmented
+                base_chem = event.chem.get_original_parent()
 
-            # store the max intensity of fragmentation for this base chem
-            parent_intensity = event.parents_intensity[0]
-            fragmented_intensities[base_chem] = max(
-                parent_intensity, fragmented_intensities[base_chem])
+                # store the max intensity of fragmentation for this base chem
+                parent_intensity = event.parents_intensity[0]
+                fragmented_intensities[base_chem] = max(
+                    parent_intensity, fragmented_intensities[base_chem])
 
     TP = 0  # chemicals hit correctly (above threshold)
     FP = 0  # chemicals hit incorrectly (below threshold)
@@ -112,19 +111,16 @@ def evaluate(env, intensity_threshold=0.5, format_output=True):
 
     assert (TP+FP+FN) == len(all_chems)
     assert len(total_frag_intensities) == len(all_chems)
-    recalculated_coverage_prop = (TP+FP)/(TP+FP+FN)
-    recalculated_intensity_prop = np.mean(total_frag_intensities)
 
-    # print('recalculated_coverage_prop', recalculated_coverage_prop, 
-    #     'evaluated_coverage_prop', vimms_env_res['coverage_proportion'][0])
-
-    # print('recalculated_intensity_prop', recalculated_intensity_prop, 
-    #     'evaluated_intensity_prop', vimms_env_res['intensity_proportion'][0])
-
-    # coverage_prop = recalculated_coverage_prop
-    # intensity_prop = recalculated_intensity_prop
+    # ensure that coverage proportion calculation is consistent with ViMMS
     coverage_prop = vimms_env_res['coverage_proportion'][0]
+    recalculated_coverage_prop = (TP+FP)/(TP+FP+FN)
+    assert coverage_prop == recalculated_coverage_prop
+
+    # ensure that intensity proportion calculation is consistent with ViMMS
     intensity_prop = vimms_env_res['intensity_proportion'][0]
+    recalculated_intensity_prop = np.mean(total_frag_intensities)
+    assert intensity_prop == recalculated_intensity_prop
 
     # compute precision, recall, f1
     try:

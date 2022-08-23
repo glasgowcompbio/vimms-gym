@@ -1,3 +1,0 @@
-,number,value,datetime_start,datetime_complete,duration,params_batch_size,params_buffer_size,params_exploration_final_eps,params_exploration_fraction,params_gamma,params_learning_rate,params_learning_starts,params_lr_schedule,params_net_arch,params_subsample_steps,params_target_update_interval,params_train_freq,state
-0,0,,2022-08-22 13:36:50.496921,,,256,10000,0.18682946509958287,0.4275584374063832,0.95,2.2044526183281714e-05,10000,constant,medium,1,1,256,RUNNING
-1,1,-499.0,2022-08-22 13:37:24.053863,2022-08-22 13:37:48.149634,0 days 00:00:24.095771,100,1000000,0.17687863670346282,0.17397325587016182,0.95,0.0006633710465982604,10000,constant,large,4,1,4,COMPLETE

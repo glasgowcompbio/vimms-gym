@@ -71,10 +71,12 @@ def tune(model_name, timesteps, params, max_peaks, out_dir,
 
     # Do not prune before 1/3 of the max budget is used
     n_evaluations = max(1, timesteps // int(eval_freq))
-    pruner = MedianPruner(n_startup_trials=n_startup_trials, n_warmup_steps=timesteps // 3)
+    n_warmup_steps = int(timesteps // 3)
+    pruner = MedianPruner(n_startup_trials=n_startup_trials, n_warmup_steps=n_warmup_steps)
     logger.info(
         f"Doing {int(n_evaluations)} intermediate evaluations for pruning based on the number of timesteps."
         f" (1 evaluation every {int(eval_freq)} timesteps)"
+        f" after warmup of {n_warmup_steps} steps"
     )
 
     # Add stream handler of stdout to show the messages
