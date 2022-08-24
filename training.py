@@ -170,7 +170,8 @@ class Objective(object):
         # eval_env = make_environment(self.max_peaks, self.params)
         # print('Creating evaluation environment with params', self.params)
         eval_env = DDAEnv(self.max_peaks, self.params)
-        eval_env = HistoryWrapper(eval_env, horizon=4)
+        eval_env = flatten_dict_observations(eval_env)
+        eval_env = HistoryWrapper(eval_env, horizon=HISTORY_HORIZON)
         eval_env = Monitor(eval_env)
 
         # Create the callback that will periodically evaluate
