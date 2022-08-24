@@ -16,7 +16,7 @@ from vimms.Roi import RoiBuilder, SmartRoiParams, RoiBuilderParams
 
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
-from vimms_gym.common import OBS_EXCLUDED, OBS_FRAGMENTED, OBS_INTENSITY, OBS_ROI_ELAPSED_TIME_SINCE_LAST_FRAG, OBS_ROI_INTENSITIES_2, OBS_ROI_INTENSITIES_3, OBS_ROI_INTENSITIES_4, OBS_ROI_INTENSITIES_5, OBS_ROI_INTENSITY_AT_LAST_FRAG, OBS_ROI_LENGTH, OBS_ROI_MAX_INTENSITY_SINCE_LAST_FRAG, OBS_ROI_MIN_INTENSITY_SINCE_LAST_FRAG, TOTAL_OBSERVATION, clip_value, MAX_OBSERVED_LOG_INTENSITY, INVALID_MOVE_REWARD, \
+from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, INVALID_MOVE_REWARD, \
     MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
     RENDER_RGB_ARRAY, render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD
 from vimms_gym.features import CleanerTopNExclusion, Feature
@@ -67,15 +67,34 @@ class DDAEnv(gym.Env):
         Defines observation spaces of m/z, RT and intensity values
         """
         combined_spaces = spaces.Dict({
+            # precursor ion features
+            'intensities': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'ms_level': spaces.Box(low=1, high=2, shape=(1,)),
+            'fragmented': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'excluded': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
 
-            # precursor ion and roi features
-            'observation': spaces.Box(low=0, high=1, shape=(self.max_peaks, TOTAL_OBSERVATION)),
+            # roi features
+            'roi_length': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_elapsed_time_since_last_frag': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_at_last_frag': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_min_intensity_since_last_frag': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_max_intensity_since_last_frag': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+
+            # roi intensity features
+            'roi_intensities_2': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensities_3': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensities_4': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensities_5': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
 
             # valid action indicators
             'valid_actions': spaces.MultiBinary(self.in_dim),
 
             # various other counts
-            'ms_level': spaces.Box(low=1, high=2, shape=(1,)),
             'fragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
             'unfragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
             'excluded_count': spaces.Box(low=0, high=1, shape=(1,)),
@@ -87,14 +106,29 @@ class DDAEnv(gym.Env):
 
     def _initial_state(self):
         features = {
-            # precursor ion and roi features
-            'observation': np.zeros((self.max_peaks, TOTAL_OBSERVATION), dtype=np.float32),
+            # precursor ion features
+            'intensities': np.zeros(self.max_peaks, dtype=np.float32),
+            'ms_level': np.zeros(1, dtype=np.float32),
+            'fragmented': np.zeros(self.max_peaks, dtype=np.float32),
+            'excluded': np.zeros(self.max_peaks, dtype=np.float32),
+
+            # roi features
+            'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_elapsed_time_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_at_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_min_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_max_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+
+            # roi intensity features
+            'roi_intensities_2': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_3': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_4': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_5': np.zeros(self.max_peaks, dtype=np.float32),
 
             # valid action indicators
             'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
 
             # various other counts
-            'ms_level': np.zeros(1, dtype=np.float32),
             'fragmented_count': np.zeros(1, dtype=np.float32),
             'unfragmented_count': np.zeros(1, dtype=np.float32),
             'excluded_count': np.zeros(1, dtype=np.float32),
@@ -164,9 +198,9 @@ class DDAEnv(gym.Env):
             state = self._initial_state()
             for i in range(len(features)):
                 f = features[i]
-                state['observation'][OBS_INTENSITY][i] = f.scaled_intensity
-                state['observation'][OBS_FRAGMENTED][i] = 0 if not f.fragmented else 1
-                state['observation'][OBS_EXCLUDED][i] = f.excluded
+                state['intensities'][i] = f.scaled_intensity
+                state['fragmented'][i] = 0 if not f.fragmented else 1
+                state['excluded'][i] = f.excluded
                 state['valid_actions'][i] = 1  # fragmentable
                 self._update_roi(f, i, state)  # update ROI information for this feature
 
@@ -281,15 +315,16 @@ class DDAEnv(gym.Env):
             except IndexError:
                 pass
 
-        state['observation'][OBS_ROI_LENGTH][i] = roi_length
-        state['observation'][OBS_ROI_ELAPSED_TIME_SINCE_LAST_FRAG][i] = roi_elapsed_time_since_last_frag
-        state['observation'][OBS_ROI_INTENSITY_AT_LAST_FRAG][i] = roi_intensity_at_last_frag
-        state['observation'][OBS_ROI_MIN_INTENSITY_SINCE_LAST_FRAG][i] = roi_min_intensity_since_last_frag
-        state['observation'][OBS_ROI_MAX_INTENSITY_SINCE_LAST_FRAG][i] = roi_max_intensity_since_last_frag
-        state['observation'][OBS_ROI_INTENSITIES_2][i] = roi_intensities_2
-        state['observation'][OBS_ROI_INTENSITIES_3][i] = roi_intensities_3
-        state['observation'][OBS_ROI_INTENSITIES_4][i] = roi_intensities_4
-        state['observation'][OBS_ROI_INTENSITIES_5][i] = roi_intensities_5
+        state['roi_length'][i] = roi_length
+        state['roi_elapsed_time_since_last_frag'][i] = roi_elapsed_time_since_last_frag
+        state['roi_intensity_at_last_frag'][i] = roi_intensity_at_last_frag
+        state['roi_min_intensity_since_last_frag'][i] = roi_min_intensity_since_last_frag
+        state['roi_max_intensity_since_last_frag'][i] = roi_max_intensity_since_last_frag
+
+        state['roi_intensities_2'][i] = roi_intensities_2
+        state['roi_intensities_3'][i] = roi_intensities_3
+        state['roi_intensities_4'][i] = roi_intensities_4
+        state['roi_intensities_5'][i] = roi_intensities_5
 
     def _get_elapsed_time_since_exclusion(self, mz, current_rt):
         """
