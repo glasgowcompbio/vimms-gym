@@ -85,12 +85,6 @@ class DDAEnv(gym.Env):
             'roi_max_intensity_since_last_frag': spaces.Box(
                 low=0, high=1, shape=(self.max_peaks,)),
 
-            # roi intensity features
-            'roi_intensities_2': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_3': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_4': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_5': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-
             # valid action indicators
             'valid_actions': spaces.MultiBinary(self.in_dim),
 
@@ -118,12 +112,6 @@ class DDAEnv(gym.Env):
             'roi_intensity_at_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_min_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_max_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-
-            # roi intensity features
-            'roi_intensities_2': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensities_3': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensities_4': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensities_5': np.zeros(self.max_peaks, dtype=np.float32),
 
             # valid action indicators
             'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
@@ -287,44 +275,11 @@ class DDAEnv(gym.Env):
         except AttributeError:  # no ROI object, or never been fragmented
             roi_max_intensity_since_last_frag = 0.0
 
-        # last few intensity values of this ROI
-        roi_intensities_2 = 0.0
-        roi_intensities_3 = 0.0
-        roi_intensities_4 = 0.0
-        roi_intensities_5 = 0.0
-
-        if roi is not None:
-            intensities = roi.intensity_list
-            try:
-                roi_intensities_2 = clip_value(np.log(intensities[-2]), MAX_OBSERVED_LOG_INTENSITY)
-            except IndexError:
-                pass
-
-            try:
-                roi_intensities_3 = clip_value(np.log(intensities[-3]), MAX_OBSERVED_LOG_INTENSITY)
-            except IndexError:
-                pass
-
-            try:
-                roi_intensities_4 = clip_value(np.log(intensities[-4]), MAX_OBSERVED_LOG_INTENSITY)
-            except IndexError:
-                pass
-
-            try:
-                roi_intensities_5 = clip_value(np.log(intensities[-5]), MAX_OBSERVED_LOG_INTENSITY)
-            except IndexError:
-                pass
-
         state['roi_length'][i] = roi_length
         state['roi_elapsed_time_since_last_frag'][i] = roi_elapsed_time_since_last_frag
         state['roi_intensity_at_last_frag'][i] = roi_intensity_at_last_frag
         state['roi_min_intensity_since_last_frag'][i] = roi_min_intensity_since_last_frag
         state['roi_max_intensity_since_last_frag'][i] = roi_max_intensity_since_last_frag
-
-        state['roi_intensities_2'][i] = roi_intensities_2
-        state['roi_intensities_3'][i] = roi_intensities_3
-        state['roi_intensities_4'][i] = roi_intensities_4
-        state['roi_intensities_5'][i] = roi_intensities_5
 
     def _get_elapsed_time_since_exclusion(self, mz, current_rt):
         """
@@ -429,8 +384,9 @@ class DDAEnv(gym.Env):
                 self.ms2_count += 1
             self.current_scan = next_scan
         else:
-            # could break wrappers .. leave the state unchanged when done
+            # could break wrappers .. leave the state unchanged when done?
             # self.state = None 
+            self.state = self._get_state(next_scan, dda_action)
             self.current_scan = None
             self.last_reward = 0
 
