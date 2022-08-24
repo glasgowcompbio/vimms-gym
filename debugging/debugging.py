@@ -1,6 +1,6 @@
 import os, sys
 
-from vimms_gym.wrappers import HistoryWrapperObsDict
+from vimms_gym.wrappers import HistoryWrapper, HistoryWrapperObsDict, flatten_dict_observations
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -33,7 +33,8 @@ def debug_run(fname, max_peaks, params, n_eval_episodes=1, deterministic=True):
     model = DQN.load(fname, custom_objects=custom_objects)
 
     eval_env = DDAEnv(max_peaks, params)
-    eval_env = HistoryWrapperObsDict(eval_env, horizon=HISTORY_HORIZON)    
+    eval_env = flatten_dict_observations(eval_env)
+    eval_env = HistoryWrapper(eval_env, horizon=HISTORY_HORIZON)    
     print(eval_env.env_params)
 
     # wrap env in Monitor, create the trial callback

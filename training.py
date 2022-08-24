@@ -9,7 +9,7 @@ from loguru import logger
 from optuna.pruners import MedianPruner
 from optuna.visualization import plot_optimization_history, plot_param_importances
 
-from vimms_gym.wrappers import HistoryWrapperObsDict
+from vimms_gym.wrappers import HistoryWrapper, flatten_dict_observations
 
 sys.path.append('.')
 
@@ -245,7 +245,9 @@ def make_environment(max_peaks, params):
             env = DDAEnv(max_peaks, params)
             check_env(env)
             env.seed(rank)
-            env = HistoryWrapperObsDict(env, horizon=HISTORY_HORIZON)
+
+            env = flatten_dict_observations(env)
+            env = HistoryWrapper(env, horizon=HISTORY_HORIZON)
             env = Monitor(env)
             return env
 
