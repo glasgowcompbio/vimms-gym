@@ -2,10 +2,11 @@ import streamlit as st
 import numpy as np
 from vimms.Evaluation import evaluate_simulated_env, EvaluationData
 
-from vimms_gym.common import METHOD_RANDOM, METHOD_FULLSCAN, METHOD_TOPN, METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, GYM_NUM_ENV
+from vimms_gym.common import HISTORY_HORIZON, METHOD_RANDOM, METHOD_FULLSCAN, METHOD_TOPN, METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, GYM_NUM_ENV
 from vimms_gym.env import DDAEnv
 from vimms_gym.policy import get_recurrent_ppo_action_probs, random_policy, fullscan_policy, topN_policy, get_ppo_action_probs, \
     get_dqn_q_values
+from vimms_gym.wrappers import HistoryWrapperObsDict
 
 
 class Episode():
@@ -187,6 +188,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
             print(f'\nEpisode {i} ({len(chems)} chemicals)')
 
         env = DDAEnv(max_peaks, env_params)
+        env = HistoryWrapperObsDict(env, horizon=HISTORY_HORIZON)    
         obs = env.reset(chems=chems)
         states = None
         done = False

@@ -9,6 +9,8 @@ from loguru import logger
 from optuna.pruners import MedianPruner
 from optuna.visualization import plot_optimization_history, plot_param_importances
 
+from vimms_gym.wrappers import HistoryWrapperObsDict
+
 sys.path.append('.')
 
 import optuna
@@ -33,7 +35,7 @@ from experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM
 
 from vimms.Common import create_if_not_exist
 from vimms_gym.env import DDAEnv
-from vimms_gym.common import METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
+from vimms_gym.common import HISTORY_HORIZON, METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
     EVAL_METRIC_F1, EVAL_METRIC_COVERAGE_PROP, EVAL_METRIC_INTENSITY_PROP, \
     EVAL_METRIC_MS1_MS2_RATIO, EVAL_METRIC_EFFICIENCY, GYM_ENV_NAME, GYM_NUM_ENV, USE_SUBPROC
 
@@ -168,6 +170,7 @@ class Objective(object):
         # eval_env = make_environment(self.max_peaks, self.params)
         # print('Creating evaluation environment with params', self.params)
         eval_env = DDAEnv(self.max_peaks, self.params)
+        eval_env = HistoryWrapperObsDict(eval_env, horizon=4)
         eval_env = Monitor(eval_env)
 
         # Create the callback that will periodically evaluate
@@ -237,13 +240,12 @@ def set_torch_threads():
 
 
 def make_environment(max_peaks, params):
-    env = DDAEnv(max_peaks, params)
-    check_env(env)
-
     def make_env(rank, seed=0):
         def _init():
             env = DDAEnv(max_peaks, params)
+            check_env(env)
             env.seed(rank)
+            env = HistoryWrapperObsDict(env, horizon=HISTORY_HORIZON)
             env = Monitor(env)
             return env
 

@@ -1,5 +1,7 @@
 import os, sys
 
+from vimms_gym.wrappers import HistoryWrapperObsDict
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
@@ -15,7 +17,7 @@ from stable_baselines3.common.monitor import Monitor
 
 from vimms.Evaluation import EvaluationData
 from vimms_gym.env import DDAEnv
-from vimms_gym.common import EVAL_METRIC_REWARD
+from vimms_gym.common import EVAL_METRIC_REWARD, HISTORY_HORIZON
 from vimms_gym.evaluation import evaluate
 
 from tune import TrialEvalCallback
@@ -31,6 +33,7 @@ def debug_run(fname, max_peaks, params, n_eval_episodes=1, deterministic=True):
     model = DQN.load(fname, custom_objects=custom_objects)
 
     eval_env = DDAEnv(max_peaks, params)
+    eval_env = HistoryWrapperObsDict(eval_env, horizon=HISTORY_HORIZON)    
     print(eval_env.env_params)
 
     # wrap env in Monitor, create the trial callback
