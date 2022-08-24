@@ -170,7 +170,7 @@ class Objective(object):
         # eval_env = make_environment(self.max_peaks, self.params)
         # print('Creating evaluation environment with params', self.params)
         eval_env = DDAEnv(self.max_peaks, self.params)
-        eval_env = HistoryWrapperObsDict(eval_env, horizon=4)
+        eval_env = HistoryWrapper(eval_env, horizon=4)
         eval_env = Monitor(eval_env)
 
         # Create the callback that will periodically evaluate
@@ -220,13 +220,13 @@ def init_model(model_name, model_params, env, out_dir=None, verbose=0):
 
     model = None
     if model_name == METHOD_PPO:
-        model = PPO('MultiInputPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
+        model = PPO('MlpPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
                     **model_params)
     elif model_name == METHOD_PPO_RECURRENT:
-        model = RecurrentPPO('MultiInputLstmPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
+        model = RecurrentPPO('MlpLstmPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
                     **model_params)        
     elif model_name == METHOD_DQN:
-        model = DQN('MultiInputPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
+        model = DQN('MlpPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
                     **model_params)
     assert model is not None
     return model
