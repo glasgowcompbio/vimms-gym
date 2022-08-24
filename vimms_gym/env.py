@@ -386,7 +386,6 @@ class DDAEnv(gym.Env):
         else:
             # could break wrappers .. leave the state unchanged when done?
             # self.state = None 
-            self.state = self._get_state(next_scan, dda_action)
             self.current_scan = None
             self.last_reward = 0
 
