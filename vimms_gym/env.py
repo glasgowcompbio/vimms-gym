@@ -429,7 +429,8 @@ class DDAEnv(gym.Env):
                 self.ms2_count += 1
             self.current_scan = next_scan
         else:
-            self.state = None
+            # could break wrappers .. leave the state unchanged when done
+            # self.state = None 
             self.current_scan = None
             self.last_reward = 0
 

@@ -1,8 +1,6 @@
 
 import gym
 import numpy as np
-import gym.spaces as spaces
-from gym import ObservationWrapper
 
 
 # modified from https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/utils/wrappers.py
@@ -63,21 +61,7 @@ class HistoryWrapper(gym.Wrapper):
 def flatten_dict_observations(env: gym.Env) -> gym.Env:
     assert isinstance(env.observation_space, gym.spaces.Dict)
     try:
-        return FlattenObservation(env)
+        return gym.wrappers.FlattenObservation(env)
     except AttributeError:
         keys = env.observation_space.spaces.keys()
         return gym.wrappers.FlattenDictWrapper(env, dict_keys=list(keys))
-
-
-class FlattenObservation(ObservationWrapper):
-    r"""Observation wrapper that flattens the observation."""
-
-    def __init__(self, env):
-        super(FlattenObservation, self).__init__(env)
-        self.observation_space = spaces.flatten_space(env.observation_space)
-
-    def observation(self, observation):
-        if observation is not None:
-            return spaces.flatten(self.env.observation_space, observation)
-        else:
-            return None
