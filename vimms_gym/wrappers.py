@@ -16,6 +16,7 @@ class HistoryWrapper(gym.Wrapper):
         assert isinstance(env.observation_space, gym.spaces.Box)
 
         wrapped_obs_space = env.observation_space
+        wrapped_action_space = env.action_space
 
         # TODO: double check, it seems wrong when we have different low and highs
         low_obs = np.repeat(wrapped_obs_space.low, horizon, axis=-1)
@@ -33,6 +34,7 @@ class HistoryWrapper(gym.Wrapper):
         self.low_obs, self.high_obs = low_obs, high_obs
         self.low, self.high = low, high
         self.obs_history = np.zeros(low_obs.shape, low_obs.dtype)
+        self.action_history = np.zeros(wrapped_action_space.shape, wrapped_action_space.dtype)
 
     def _create_obs_from_history(self):
         return self.obs_history
