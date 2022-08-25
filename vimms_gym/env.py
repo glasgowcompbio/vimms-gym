@@ -344,6 +344,7 @@ class DDAEnv(gym.Env):
         self.elapsed_scans_since_last_ms1 = 0
         self.ms1_count = 0
         self.ms2_count = 0
+        self.invalid_action_count = 0
 
         # track regions of interest
         smartroi_params = SmartRoiParams()
@@ -384,7 +385,7 @@ class DDAEnv(gym.Env):
                 self.ms2_count += 1
             self.current_scan = next_scan
         else:
-            # could break wrappers .. leave the state unchanged when done?
+            # TODO: could break wrappers .. leave the state unchanged when done?
             # self.state = None 
             self.current_scan = None
             self.last_reward = 0
@@ -463,6 +464,7 @@ class DDAEnv(gym.Env):
         # if not a valid move, give a large negative reward
         if not is_valid:
             reward = INVALID_MOVE_REWARD
+            self.invalid_action_count += 1
         else:
 
             # if ms1, give constant positive reward

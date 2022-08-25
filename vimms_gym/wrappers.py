@@ -39,11 +39,11 @@ class HistoryWrapper(gym.Wrapper):
     def _create_obs_from_history(self):
         return self.obs_history
 
-    def reset(self):
+    def reset(self, chems=None):
         # Flush the history
         self.obs_history[...] = 0
         self.action_history[...] = 0
-        obs = self.env.reset()
+        obs = self.env.reset(chems=chems)
         self.obs_history[..., -obs.shape[-1] :] = obs
         return self._create_obs_from_history()
 

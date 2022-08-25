@@ -42,6 +42,7 @@ class Episode():
         self.eval_data = EvaluationData(vimms_env)
         self.eval_res = evaluate(vimms_env, intensity_threshold)
         self.eval_res['total_rewards'] = sum(self.rewards)
+        self.eval_res['invalid_action_count'] = env.invalid_action_count
         return self.eval_res
 
     def get_total_rewards(self):
@@ -199,9 +200,11 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
         episode_starts = np.ones((1,), dtype=bool)        
         while not done:  # repeat until episode is done
 
+            unwrapped_obs = env.env.env.state # access the state attribute in DDAEnv
+
             # select an action depending on the observation and method
             action, action_probs, states = pick_action(
-                method, obs, model, env.features, N, min_ms1_intensity, states=states, episode_starts=episode_starts)
+                method, obs, unwrapped_obs, model, env.features, N, min_ms1_intensity, states=states, episode_starts=episode_starts)
 
             # make one step through the simulation
             obs, reward, done, info = env.step(action)
@@ -237,7 +240,8 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
     return all_episodic_results
 
 
-def pick_action(method, obs, model, features, N, min_ms1_intensity, states=None, episode_starts=None):
+def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensity, 
+    states=None, episode_starts=None):
     action_probs = []
 
     if method != METHOD_PPO_RECURRENT:
@@ -247,11 +251,11 @@ def pick_action(method, obs, model, features, N, min_ms1_intensity, states=None,
             method = METHOD_PPO
 
     if method == METHOD_RANDOM:
-        action = random_policy(obs)
+        action = random_policy(unwrapped_obs)
     elif method == METHOD_FULLSCAN:
-        action = fullscan_policy(obs)
+        action = fullscan_policy(unwrapped_obs)
     elif method == METHOD_TOPN:
-        action = topN_policy(obs, features, N, min_ms1_intensity)
+        action = topN_policy(unwrapped_obs, features, N, min_ms1_intensity)
     elif method == METHOD_PPO:
         action, states = model.predict(obs, deterministic=True)
         action_probs = get_ppo_action_probs(model, obs)
