@@ -86,8 +86,8 @@ class DDAEnv(gym.Env):
 
             # valid action indicators, last action and current ms level
             'valid_actions': spaces.MultiBinary(self.in_dim),
-            'last_action': spaces.Discrete(self.in_dim),
-            'ms_level': spaces.Box(low=1, high=2, shape=(1,)),
+            'last_action': spaces.Discrete(self.in_dim+1),
+            'ms_level': spaces.Discrete(2), # either MS1 or MS2 scans
 
             # various other counts
             'fragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
@@ -115,8 +115,8 @@ class DDAEnv(gym.Env):
 
             # valid action indicators
             'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
-            'ms_level': np.zeros(1, dtype=np.float32),
-            'last_action': np.zeros(1, dtype=np.float32),
+            'ms_level': 0,
+            'last_action': 0,
 
             # various other counts
             'fragmented_count': np.zeros(1, dtype=np.float32),
@@ -197,7 +197,7 @@ class DDAEnv(gym.Env):
                 state['valid_actions'][i] = 1  # fragmentable
                 self._update_roi(f, i, state)  # update ROI information for this feature
 
-            state['ms_level'][0] = 1
+            state['ms_level'] = 0
             self.elapsed_scans_since_last_ms1 = 0
 
         elif dda_action.ms_level == 2:
@@ -238,7 +238,7 @@ class DDAEnv(gym.Env):
                 excluded = self._get_elapsed_time_since_exclusion(f.mz, current_rt)
                 state['excluded'][i] = excluded
 
-            state['ms_level'][0] = 2
+            state['ms_level'] = 1
             self.elapsed_scans_since_last_ms1 += 1
 
         state['valid_actions'][-1] = 1  # ms1 action is always valid

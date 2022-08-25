@@ -42,10 +42,13 @@ def obs_to_dfs(obs, features):
         if key == 'valid_actions':
             continue
         val = obs[key]
-        if len(val) == 1:
+        try:
+            if len(val) == 1:
+                count_obs[key] = val
+            else:
+                scan_obs[key] = val
+        except TypeError: # no length, so must be a scalar
             count_obs[key] = val
-        else:
-            scan_obs[key] = val
 
     scan_df = pd.DataFrame(scan_obs)
 
