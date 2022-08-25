@@ -69,7 +69,6 @@ class DDAEnv(gym.Env):
         combined_spaces = spaces.Dict({
             # precursor ion features
             'intensities': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'ms_level': spaces.Box(low=1, high=2, shape=(1,)),
             'fragmented': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'excluded': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
 
@@ -85,8 +84,10 @@ class DDAEnv(gym.Env):
             'roi_max_intensity_since_last_frag': spaces.Box(
                 low=0, high=1, shape=(self.max_peaks,)),
 
-            # valid action indicators
+            # valid action indicators, last action and current ms level
             'valid_actions': spaces.MultiBinary(self.in_dim),
+            'last_action': spaces.Discrete(self.in_dim),
+            'ms_level': spaces.Box(low=1, high=2, shape=(1,)),
 
             # various other counts
             'fragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
@@ -102,7 +103,6 @@ class DDAEnv(gym.Env):
         features = {
             # precursor ion features
             'intensities': np.zeros(self.max_peaks, dtype=np.float32),
-            'ms_level': np.zeros(1, dtype=np.float32),
             'fragmented': np.zeros(self.max_peaks, dtype=np.float32),
             'excluded': np.zeros(self.max_peaks, dtype=np.float32),
 
@@ -115,6 +115,8 @@ class DDAEnv(gym.Env):
 
             # valid action indicators
             'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
+            'ms_level': np.zeros(1, dtype=np.float32),
+            'last_action': np.zeros(1, dtype=np.float32),
 
             # various other counts
             'fragmented_count': np.zeros(1, dtype=np.float32),
@@ -139,6 +141,9 @@ class DDAEnv(gym.Env):
 
         self.elapsed_scans_since_start += 1
         if dda_action.ms_level == 1:
+
+            # store last action
+            self.last_action = self.in_dim
 
             # new ms1 scan, so initialise a new state
             mzs, rt, intensities = self._get_mzs_rt_intensities(scan_to_process)
@@ -202,6 +207,9 @@ class DDAEnv(gym.Env):
             idx = dda_action.idx
             assert idx is not None
 
+            # store last action
+            self.last_action = idx
+
             # update fragmented flag
             state['fragmented'][idx] = 1
 
@@ -234,6 +242,7 @@ class DDAEnv(gym.Env):
             self.elapsed_scans_since_last_ms1 += 1
 
         state['valid_actions'][-1] = 1  # ms1 action is always valid
+        state['last_action'] = self.last_action
         return state
 
     def _update_roi(self, feature, i, state):
@@ -339,6 +348,7 @@ class DDAEnv(gym.Env):
         self.episode_done = False
         self.last_ms1_scan = None
         self.last_reward = 0.0
+        self.last_action = None
 
         self.elapsed_scans_since_start = 0
         self.elapsed_scans_since_last_ms1 = 0
