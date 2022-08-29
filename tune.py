@@ -304,10 +304,10 @@ class TrialEvalCallback(EvalCallback):
                     val = eval_res[self.eval_metric]
 
                 end = timer()
-                delta = timedelta(seconds=end - start)
+                delta = end - start
                 if self.verbose > 0:
                     print('Evaluation episode %d finished: metric %f, timedelta=%s' % (
-                        episode_count, val, str(delta)))                    
+                        episode_count, val, str(timedelta(seconds=delta))))                    
                 if delta > self.max_eval_time_per_episode:
                     raise ValueError('Eval time per episode exceeds the budget of %f seconds' % self.max_eval_time_per_episode)
                 start = timer()
