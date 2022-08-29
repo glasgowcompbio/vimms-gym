@@ -35,61 +35,22 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
     if model_name == METHOD_DQN:
 
-        # somewhat working
-        # gamma = 0.98
-        # learning_rate = 0.000264967
-        # batch_size = 512
-        # buffer_size = 1000000
-        # train_freq = 16
-        # subsample_steps = 1
-        # gradient_steps = max(train_freq // subsample_steps, 1)
-        # exploration_fraction = 0.282560492
-        # exploration_final_eps = 0.057327231
-        # target_update_interval = 15000
-        # learning_starts = 0
-        # hidden_nodes = 512
-
-        # DQN_4: optimising reward -- stuck on producing MS1 scans only
-        # gamma = 0.95
-        # learning_rate = 0.231964597
-        # batch_size = 64
-        # buffer_size = 50000
-        # train_freq = 8
-        # subsample_steps = 8
-        # gradient_steps = max(train_freq // subsample_steps, 1)
-        # exploration_fraction = 0.113672411
-        # exploration_final_eps = 0.193254046
-        # target_update_interval = 15000
-        # learning_starts = 10000
-        # hidden_nodes = 256
-
-        # DQN_24: best on optimising reward but need more timesteps (now 200K)
-        # gamma = 0.98
-        # learning_rate = 0.000608383
-        # batch_size = 512
-        # buffer_size = 100000
-        # train_freq = 256
-        # subsample_steps = 2
-        # gradient_steps = max(train_freq // subsample_steps, 1)
-        # exploration_fraction = 0.213530912
-        # exploration_final_eps = 0.053157309
-        # target_update_interval = 20000
-        # learning_starts = 0
-        # hidden_nodes = 512
-
-        # DQN_9: best on optimising F1 (500K timesteps), but can't reproduce the results during testing
-        gamma = 0.95
-        learning_rate = 0.001138298
-        batch_size = 32
-        buffer_size = 1000000
-        train_freq = 128
-        subsample_steps = 2
+        # best F-1 score result with 5E5 timesteps
+        # alpha   = 0.489231295
+        # beta    = 0.07277375
+        # horizon = 4
+        gamma = 0.9
+        learning_rate = 0.000238173
+        batch_size = 128
+        buffer_size = 100000
+        train_freq = 1
+        subsample_steps = 4
         gradient_steps = max(train_freq // subsample_steps, 1)
-        exploration_fraction = 0.403751466
-        exploration_final_eps = 0.189805909
-        target_update_interval = 15000
-        learning_starts = 0
-        hidden_nodes = 256
+        exploration_fraction = 0.291786842
+        exploration_final_eps = 0.109176895
+        target_update_interval = 20000
+        learning_starts = 20000
+        hidden_nodes = 512
 
         policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {
