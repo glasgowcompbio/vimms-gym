@@ -35,7 +35,7 @@ from experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM
 
 from vimms.Common import create_if_not_exist
 from vimms_gym.env import DDAEnv
-from vimms_gym.common import HISTORY_HORIZON, METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
+from vimms_gym.common import HISTORY_HORIZON, MAX_EVAL_TIME_PER_EPISODE, METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
     EVAL_METRIC_F1, EVAL_METRIC_COVERAGE_PROP, EVAL_METRIC_INTENSITY_PROP, \
     EVAL_METRIC_MS1_MS2_RATIO, EVAL_METRIC_EFFICIENCY, GYM_ENV_NAME, GYM_NUM_ENV, USE_SUBPROC
 
@@ -67,8 +67,8 @@ def train(model_name, timesteps, params, max_peaks, out_dir, out_file, verbose=0
 
 
 def tune(model_name, timesteps, params, max_peaks, out_dir,
-         n_trials, n_eval_episodes, eval_freq, eval_metric, tune_model,
-         tune_reward, n_startup_trials=0, verbose=0):
+         n_trials, n_eval_episodes, eval_freq, eval_metric, max_eval_time_per_episode,
+         tune_model, tune_reward, n_startup_trials=0, verbose=0):
     set_torch_threads()
 
     # Do not prune before 1/3 of the max budget is used
@@ -89,9 +89,9 @@ def tune(model_name, timesteps, params, max_peaks, out_dir,
                                 pruner=pruner, direction='maximize')
     try:
         objective = Objective(model_name, timesteps, params, max_peaks, out_dir,
-                              n_evaluations, n_eval_episodes, eval_metric,
+                              n_evaluations, n_eval_episodes, eval_metric, max_eval_time_per_episode,
                               tune_model, tune_reward, verbose=verbose)
-        study.optimize(objective, n_trials=n_trials)
+        study.optimize(objective, n_trials=n_trials, catch=(ValueError,))
     except KeyboardInterrupt:
         pass
 
@@ -121,8 +121,8 @@ def tune(model_name, timesteps, params, max_peaks, out_dir,
 
 class Objective(object):
     def __init__(self, model_name, timesteps, params, max_peaks, out_dir,
-                 n_evaluations, n_eval_episodes, eval_metric, tune_model, tune_reward,
-                 verbose=0):
+                 n_evaluations, n_eval_episodes, eval_metric, max_eval_time_per_episode, 
+                 tune_model, tune_reward, verbose=0):
         self.model_name = model_name
         self.timesteps = timesteps
         self.params = params
@@ -131,6 +131,7 @@ class Objective(object):
         self.n_evaluations = n_evaluations
         self.n_eval_episodes = n_eval_episodes
         self.eval_metric = eval_metric
+        self.max_eval_time_per_episode = max_eval_time_per_episode
         self.tune_model = tune_model
         self.tune_reward = tune_reward
         self.verbose = verbose
@@ -180,10 +181,11 @@ class Objective(object):
         optuna_eval_freq = max(optuna_eval_freq // GYM_NUM_ENV,
                                1)  # adjust for multiple environments
         eval_callback = TrialEvalCallback(
-            eval_env, trial, self.eval_metric, best_model_save_path=self.out_dir,
-            log_path=self.out_dir,
-            n_eval_episodes=self.n_eval_episodes, eval_freq=optuna_eval_freq, deterministic=True,
-            verbose=self.verbose
+            eval_env, trial, self.eval_metric, self.n_eval_episodes, 
+            optuna_eval_freq, self.max_eval_time_per_episode,
+            deterministic=True, verbose=self.verbose, 
+            best_model_save_path=self.out_dir,
+            log_path=self.out_dir
         )
 
         try:
@@ -291,6 +293,9 @@ if __name__ == '__main__':
     parser.add_argument('--eval_freq', default=EVAL_FREQ, type=float,
                         help='Frequency of intermediate evaluation steps before pruning an '
                              'episode in optuna tuning')
+    parser.add_argument('--max_eval_time_per_episode', default=MAX_EVAL_TIME_PER_EPISODE, type=float,
+                        help='Maximum time allowed to run one evaluation episode in a trial '
+                             'during optuna tuning')
     parser.add_argument('--eval_metric', choices=[
         EVAL_METRIC_REWARD,
         EVAL_METRIC_F1,
@@ -342,7 +347,7 @@ if __name__ == '__main__':
     # actually train the model here
     if args.tune_model or args.tune_reward:
         tune(model_name, args.timesteps, params, max_peaks, out_dir, args.n_trials,
-            args.n_eval_episodes, int(args.eval_freq), args.eval_metric,
+            args.n_eval_episodes, int(args.eval_freq), args.eval_metric, args.max_eval_time_per_episode,
             args.tune_model, args.tune_reward, verbose=args.verbose)
     else:
         train(model_name, args.timesteps, params, max_peaks, out_dir, args.out_file, 

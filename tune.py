@@ -12,7 +12,7 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.vec_env import sync_envs_normalization
 from vimms.Evaluation import EvaluationData
 
-from vimms_gym.common import linear_schedule, EVAL_METRIC_REWARD, EVAL_METRIC_F1
+from vimms_gym.common import linear_schedule, EVAL_METRIC_REWARD, EVAL_METRIC_F1, MAX_EVAL_TIME_PER_EPISODE
 from vimms_gym.evaluation import evaluate
 
 
@@ -156,8 +156,8 @@ def sample_ppo_params(trial, tune_model, tune_reward):
 
 
 class TrialEvalCallback(EvalCallback):
-    def __init__(self, eval_env, trial, eval_metric, n_eval_episodes=5, eval_freq=10000, deterministic=True,
-                 verbose=0, best_model_save_path=None, log_path=None):
+    def __init__(self, eval_env, trial, eval_metric, n_eval_episodes, eval_freq, max_eval_time_per_episode,
+                 deterministic=True, verbose=0, best_model_save_path=None, log_path=None):
         super().__init__(
             eval_env=eval_env,
             n_eval_episodes=n_eval_episodes,
@@ -171,6 +171,7 @@ class TrialEvalCallback(EvalCallback):
         self.eval_idx = 0
         self.is_pruned = False
         self.eval_metric = eval_metric
+        self.max_eval_time_per_episode = max_eval_time_per_episode
 
     def _init_callback(self) -> None:
         # Does not work in some corner cases, where the wrapper is not the same
@@ -301,11 +302,15 @@ class TrialEvalCallback(EvalCallback):
                     eval_res = evaluate(eval_data, format_output=False)
                     assert self.eval_metric in eval_res, 'Unknown evaluation metric'
                     val = eval_res[self.eval_metric]
+
+                end = timer()
+                delta = timedelta(seconds=end - start)
                 if self.verbose > 0:
-                    end = timer()
                     print('Evaluation episode %d finished: metric %f, timedelta=%s' % (
-                        episode_count, val, str(timedelta(seconds=end - start))))
-                    start = timer()
+                        episode_count, val, str(delta)))                    
+                if delta > self.max_eval_time_per_episode:
+                    raise ValueError('Eval time per episode exceeds the budget of %f seconds' % self.max_eval_time_per_episode)
+                start = timer()
                 episode_rewards.append(val)
                 episode_lengths.append(current_length)
                 episode_count += 1
