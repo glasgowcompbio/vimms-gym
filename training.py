@@ -47,11 +47,11 @@ N_TRIALS = 100
 N_EVAL_EPISODES = 30
 
 
-def train(model_name, timesteps, params, max_peaks, out_dir, out_file, verbose=0):
+def train(model_name, timesteps, horizon, params, max_peaks, out_dir, out_file, verbose=0):
     set_torch_threads()
 
     model_params = params['model']
-    env = make_environment(max_peaks, params)
+    env = make_environment(max_peaks, params, horizon)
     model = init_model(model_name, model_params, env, out_dir=out_dir, verbose=verbose)
 
     checkpoint_callback = CheckpointCallback(
@@ -66,7 +66,7 @@ def train(model_name, timesteps, params, max_peaks, out_dir, out_file, verbose=0
     model.save(fname)
 
 
-def tune(model_name, timesteps, params, max_peaks, out_dir,
+def tune(model_name, timesteps, horizon, params, max_peaks, out_dir,
          n_trials, n_eval_episodes, eval_freq, eval_metric, max_eval_time_per_episode,
          tune_model, tune_reward, n_startup_trials=0, verbose=0):
     set_torch_threads()
@@ -88,7 +88,7 @@ def tune(model_name, timesteps, params, max_peaks, out_dir,
     study = optuna.create_study(study_name=study_name, storage=storage_name, load_if_exists=True,
                                 pruner=pruner, direction='maximize')
     try:
-        objective = Objective(model_name, timesteps, params, max_peaks, out_dir,
+        objective = Objective(model_name, timesteps, horizon, params, max_peaks, out_dir,
                               n_evaluations, n_eval_episodes, eval_metric, max_eval_time_per_episode,
                               tune_model, tune_reward, verbose=verbose)
         study.optimize(objective, n_trials=n_trials, catch=(ValueError,))
@@ -120,11 +120,12 @@ def tune(model_name, timesteps, params, max_peaks, out_dir,
 
 
 class Objective(object):
-    def __init__(self, model_name, timesteps, params, max_peaks, out_dir,
+    def __init__(self, model_name, timesteps, horizon, params, max_peaks, out_dir,
                  n_evaluations, n_eval_episodes, eval_metric, max_eval_time_per_episode, 
                  tune_model, tune_reward, verbose=0):
         self.model_name = model_name
         self.timesteps = timesteps
+        self.horizon = horizon
         self.params = params
         self.max_peaks = max_peaks
         self.out_dir = out_dir
@@ -172,7 +173,7 @@ class Objective(object):
         # print('Creating evaluation environment with params', self.params)
         eval_env = DDAEnv(self.max_peaks, self.params)
         eval_env = flatten_dict_observations(eval_env)
-        eval_env = HistoryWrapper(eval_env, horizon=HISTORY_HORIZON)
+        eval_env = HistoryWrapper(eval_env, horizon=self.horizon)
         eval_env = Monitor(eval_env)
 
         # Create the callback that will periodically evaluate
@@ -242,7 +243,7 @@ def set_torch_threads():
     torch.set_num_threads(torch_threads)
 
 
-def make_environment(max_peaks, params):
+def make_environment(max_peaks, params, horizon):
     def make_env(rank, seed=0):
         def _init():
             env = DDAEnv(max_peaks, params)
@@ -250,7 +251,7 @@ def make_environment(max_peaks, params):
             env.seed(rank)
 
             env = flatten_dict_observations(env)
-            env = HistoryWrapper(env, horizon=HISTORY_HORIZON)
+            env = HistoryWrapper(env, horizon=horizon)
             env = Monitor(env)
             return env
 
@@ -282,6 +283,9 @@ if __name__ == '__main__':
         METHOD_DQN
     ], required=True, type=str, help='Specify model name')
     parser.add_argument('--timesteps', required=True, type=float, help='Training timesteps')
+    parser.add_argument('--horizon', default=HISTORY_HORIZON, type=int,
+                        help='How many actions and observations to consider for history wrapping')
+
     parser.add_argument('--tune_model', action='store_true',
                         help='Optimise model parameters instead of training')
     parser.add_argument('--tune_reward', action='store_true',
@@ -346,9 +350,9 @@ if __name__ == '__main__':
 
     # actually train the model here
     if args.tune_model or args.tune_reward:
-        tune(model_name, args.timesteps, params, max_peaks, out_dir, args.n_trials,
+        tune(model_name, args.timesteps, args.horizon, params, max_peaks, out_dir, args.n_trials,
             args.n_eval_episodes, int(args.eval_freq), args.eval_metric, args.max_eval_time_per_episode,
             args.tune_model, args.tune_reward, verbose=args.verbose)
     else:
-        train(model_name, args.timesteps, params, max_peaks, out_dir, args.out_file, 
+        train(model_name, args.timesteps, args.horizon, params, max_peaks, out_dir, args.out_file, 
             verbose=args.verbose)
