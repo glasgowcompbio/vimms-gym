@@ -98,18 +98,23 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
     params['env']['beta'] = beta
 
     if model_name == METHOD_DQN:
-        gamma = 0.999
-        learning_rate = 0.00018059
-        batch_size = 512
+
+        # 3rd best F-1 score result with 1E6 timesteps
+        # alpha   = 0.005046535
+        # beta    = 0.649154698
+        # horizon = 4
+        gamma = 0.98
+        learning_rate = 4.66E-05
+        batch_size = 128
         buffer_size = 50000
-        train_freq = 4
-        subsample_steps = 4
+        train_freq = 1
+        subsample_steps = 2
         gradient_steps = max(train_freq // subsample_steps, 1)
-        exploration_fraction = 0.023036701
-        exploration_final_eps = 0.132604162
-        target_update_interval = 20000
-        learning_starts = 20000
-        hidden_nodes = 512
+        exploration_fraction = 0.325427907
+        exploration_final_eps = 0.130140357
+        target_update_interval = 10000
+        learning_starts = 5000
+        hidden_nodes = 64
         policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {
             'gamma': gamma,
