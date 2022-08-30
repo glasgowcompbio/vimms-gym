@@ -135,6 +135,7 @@ notebooks/simulated_chems_small/evaluation
 notebooks/QCB_chems_medium/evaluation
 notebooks/QCB_chems_medium/optimise_baselines
 samplers_QC*.p
-notebooks/*/evaluation_*
+notebooks/*/evaluation_*/*.mzML
+notebooks/*/evaluation_*/*.p
 notebooks/QCB_resimulated_medium/evaluation
 notebooks/QCB_resimulated_medium/optimise_baselines
