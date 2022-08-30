@@ -21,7 +21,7 @@ def sample_dqn_params(trial, tune_model, tune_reward):
 
     if tune_model:
         gamma = trial.suggest_categorical('gamma', [0.9, 0.95, 0.98, 0.99, 0.995, 0.999, 0.9999])
-        learning_rate = trial.suggest_loguniform('learning_rate', 1e-5, 1)
+        learning_rate = trial.suggest_float('learning_rate', 1e-5, 1, log=True)
         lr_schedule = trial.suggest_categorical('lr_schedule', ['linear', 'constant'])
         if lr_schedule == 'linear':
             learning_rate = linear_schedule(learning_rate)
@@ -29,10 +29,10 @@ def sample_dqn_params(trial, tune_model, tune_reward):
         batch_size = trial.suggest_categorical('batch_size', [16, 32, 64, 100, 128, 256, 512])
         buffer_size = trial.suggest_categorical('buffer_size',
                                                 [int(1e4), int(5e4), int(1e5), int(1e6)])
-        exploration_final_eps = trial.suggest_uniform('exploration_final_eps', 0, 0.2)
-        exploration_fraction = trial.suggest_uniform('exploration_fraction', 0, 0.5)
+        exploration_final_eps = trial.suggest_float('exploration_final_eps', 0, 0.2)
+        exploration_fraction = trial.suggest_float('exploration_fraction', 0, 0.5)
         target_update_interval = trial.suggest_categorical('target_update_interval',
-                                                           [1, 1000, 5000, 10000, 15000, 20000])
+                                                            [1, 1000, 5000, 10000, 15000, 20000])
         learning_starts = trial.suggest_categorical('learning_starts',
                                                     [0, 1000, 5000, 10000, 20000])
 
@@ -79,19 +79,19 @@ def sample_ppo_params(trial, tune_model, tune_reward):
         batch_size = trial.suggest_categorical('batch_size', [8, 16, 32, 64, 128, 256, 512])
         n_steps = trial.suggest_categorical('n_steps', [8, 16, 32, 64, 128, 256, 512, 1024, 2048])
         gamma = trial.suggest_categorical('gamma', [0.9, 0.95, 0.98, 0.99, 0.995, 0.999, 0.9999])
-        learning_rate = trial.suggest_loguniform('learning_rate', 1e-5, 1)
+        learning_rate = trial.suggest_float('learning_rate', 1e-5, 1, log=True)
         lr_schedule = trial.suggest_categorical('lr_schedule', ['linear', 'constant'])
-        ent_coef = trial.suggest_loguniform('ent_coef', 0.00000001, 0.1)
+        ent_coef = trial.suggest_float('ent_coef', 0.00000001, 0.1, log=True)
         clip_range = trial.suggest_categorical('clip_range', [0.1, 0.2, 0.3, 0.4])
         n_epochs = trial.suggest_categorical('n_epochs', [1, 5, 10, 20])
         gae_lambda = trial.suggest_categorical('gae_lambda',
-                                               [0.8, 0.9, 0.92, 0.95, 0.98, 0.99, 1.0])
+                                                [0.8, 0.9, 0.92, 0.95, 0.98, 0.99, 1.0])
         max_grad_norm = trial.suggest_categorical('max_grad_norm',
-                                                  [0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 5])
-        vf_coef = trial.suggest_uniform('vf_coef', 0, 1)
+                                                    [0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 5])
+        vf_coef = trial.suggest_float('vf_coef', 0, 1)
 
         # Uncomment for gSDE (continuous actions)
-        # log_std_init = trial.suggest_uniform('log_std_init', -4, 1)
+        # log_std_init = trial.suggest_float('log_std_init', -4, 1)
 
         # Uncomment for gSDE (continuous action)
         # sde_sample_freq = trial.suggest_categorical('sde_sample_freq', [-1, 8, 16, 32, 64, 128, 256])
