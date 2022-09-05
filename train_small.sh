@@ -1,5 +1,46 @@
 #!/bin/bash
 
-python training.py --preset QCB_chems_small --model DQN --timesteps 2E6 --results notebooks/QCB_chems_small --alpha 0.25 --beta 0.10 --verbose 2
-python training.py --preset QCB_chems_small --model DQN --timesteps 2E6 --results notebooks/QCB_chems_small --alpha 0.5 --beta 0.10 --verbose 2
-python training.py --preset QCB_chems_small --model DQN --timesteps 2E6 --results notebooks/QCB_chems_small --alpha 0.75 --beta 0.10 --verbose 2
+env_name="DDAEnv"
+repeat=5
+timesteps=5E5
+results="notebooks/QCB_chems_small"
+model_name="DQN"
+
+### Balanced ###
+
+model_type="Balanced"
+alpha=0.50
+beta=0.00
+
+for (( i=0; i<=${repeat}; i++ ))
+do
+    out_file="${env_name}_${model_name}_${model_type}_${i}.zip"    
+    echo "Training ${out_file}"
+    python training.py --preset QCB_chems_small --model DQN --timesteps ${timesteps} --results ${results} --alpha ${alpha} --beta ${beta} --out_file ${out_file}
+done
+
+### Intensity ###
+
+model_type="Intensity"
+alpha=0.25
+beta=0.00
+
+for (( i=0; i<=${repeat}; i++ ))
+do
+    out_file="${env_name}_${model_name}_${model_type}_${i}.zip"    
+    echo "Training ${out_file}"
+    python training.py --preset QCB_chems_small --model DQN --timesteps ${timesteps} --results ${results} --alpha ${alpha} --beta ${beta} --out_file ${out_file}
+done
+
+### Coverage ###
+
+model_type="Coverage"
+alpha=0.75
+beta=0.00
+
+for (( i=0; i<=${repeat}; i++ ))
+do
+    out_file="${env_name}_${model_name}_${model_type}_${i}.zip"    
+    echo "Training ${out_file}"
+    python training.py --preset QCB_chems_small --model DQN --timesteps ${timesteps} --results ${results} --alpha ${alpha} --beta ${beta} --out_file ${out_file}
+done
