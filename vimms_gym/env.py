@@ -17,10 +17,10 @@ from vimms.Roi import RoiBuilder, SmartRoiParams, RoiBuilderParams
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 
-from vimms_gym.common import clip_value, MAX_OBSERVED_LOG_INTENSITY, INVALID_MOVE_REWARD, \
+from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, \
     MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
     RENDER_RGB_ARRAY, render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, \
-    EVAL_F1_INTENSITY_THRESHOLD, evaluate
+    EVAL_F1_INTENSITY_THRESHOLD, evaluate, scale_intensity
 
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
@@ -88,10 +88,10 @@ class DDAEnv(gym.Env):
                 low=0, high=1, shape=(self.max_peaks,)),
 
             # roi intensity features
-            'roi_intensities_2': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensities_3': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensities_4': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensities_5': np.zeros(self.max_peaks, dtype=np.float32),                
+            'roi_intensities_2': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensities_3': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensities_4': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensities_5': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),            
 
             # valid action indicators, last action and current ms level
             'valid_actions': spaces.MultiBinary(self.in_dim),
@@ -123,10 +123,10 @@ class DDAEnv(gym.Env):
             'roi_max_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi intensity features
-            'roi_intensities_2': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_3': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_4': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_5': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),            
+            'roi_intensities_2': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_3': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_4': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_5': np.zeros(self.max_peaks, dtype=np.float32),                
 
             # valid action indicators
             'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
@@ -175,8 +175,7 @@ class DDAEnv(gym.Env):
             for i in sorted_indices[0:self.max_peaks]:
                 mz = mzs[i]
                 original_intensity = intensities[i]
-                scaled_intensity = clip_value(np.log(original_intensity),
-                                              MAX_OBSERVED_LOG_INTENSITY)
+                scaled_intensity = scale_intensity(original_intensity)
 
                 # initially nothing has been fragmented
                 fragmented = False
@@ -281,21 +280,21 @@ class DDAEnv(gym.Env):
         try:
             # intensity of this ROI at last fragmentation
             val = roi.intensity_list[roi.fragmented_index]
-            roi_intensity_at_last_frag = clip_value(np.log(val), MAX_OBSERVED_LOG_INTENSITY)
+            roi_intensity_at_last_frag = scale_intensity(val)
         except AttributeError:  # no ROI object, or never been fragmented
             roi_intensity_at_last_frag = 0.0
 
         try:
             # minimum intensity of this ROI since last fragmentation
             val = min(roi.intensity_list[roi.fragmented_index:])
-            roi_min_intensity_since_last_frag = clip_value(np.log(val), MAX_OBSERVED_LOG_INTENSITY)
+            roi_min_intensity_since_last_frag = scale_intensity(val)
         except AttributeError:  # no ROI object, or never been fragmented
             roi_min_intensity_since_last_frag = 0.0
 
         try:
             # maximum intensity of this ROI since last fragmentation
             val = max(roi.intensity_list[roi.fragmented_index:])
-            roi_max_intensity_since_last_frag = clip_value(np.log(val), MAX_OBSERVED_LOG_INTENSITY)
+            roi_max_intensity_since_last_frag = scale_intensity(val)
         except AttributeError:  # no ROI object, or never been fragmented
             roi_max_intensity_since_last_frag = 0.0
 
@@ -308,22 +307,22 @@ class DDAEnv(gym.Env):
         if roi is not None:
             intensities = roi.intensity_list
             try:
-                roi_intensities_2 = clip_value(np.log(intensities[-2]), MAX_OBSERVED_LOG_INTENSITY)
+                roi_intensities_2 = scale_intensity(intensities[-2])
             except IndexError:
                 pass
 
             try:
-                roi_intensities_3 = clip_value(np.log(intensities[-3]), MAX_OBSERVED_LOG_INTENSITY)
+                roi_intensities_3 = scale_intensity(intensities[-3])
             except IndexError:
                 pass
 
             try:
-                roi_intensities_4 = clip_value(np.log(intensities[-4]), MAX_OBSERVED_LOG_INTENSITY)
+                roi_intensities_4 = scale_intensity(intensities[-4])
             except IndexError:
                 pass
 
             try:
-                roi_intensities_5 = clip_value(np.log(intensities[-5]), MAX_OBSERVED_LOG_INTENSITY)
+                roi_intensities_5 = scale_intensity(intensities[-5])
             except IndexError:
                 pass
 

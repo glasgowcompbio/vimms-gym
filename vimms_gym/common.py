@@ -7,7 +7,8 @@ from vimms.Evaluation import evaluate_simulated_env
 MS1_REWARD = 0.1
 INVALID_MOVE_REWARD = -1.0
 NO_FRAGMENTATION_REWARD = -100.0
-MAX_OBSERVED_LOG_INTENSITY = np.log(1E20)
+MAX_OBSERVED_INTENSITY = 1E20
+MAX_OBSERVED_LOG_INTENSITY = np.log(MAX_OBSERVED_INTENSITY)
 MAX_ROI_LENGTH_SECONDS = 100
 HISTORY_HORIZON = 1
 MAX_EVAL_TIME_PER_EPISODE = 300
@@ -56,6 +57,14 @@ def clip_value(value, max_value, min_range=0.0, max_range=1.0):
     elif value > max_range:
         value = max_range
     return value
+
+
+def scale_intensity(original_intensity, log=False):
+    if log:
+        scaled_intensity = clip_value(np.log(original_intensity), MAX_OBSERVED_LOG_INTENSITY)
+    else:
+        scaled_intensity = clip_value(original_intensity, MAX_OBSERVED_INTENSITY)
+    return scaled_intensity
 
 
 def render_scan(scan):
