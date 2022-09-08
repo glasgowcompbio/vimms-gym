@@ -12,8 +12,8 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.vec_env import sync_envs_normalization
 from vimms.Evaluation import EvaluationData
 
-from vimms_gym.common import linear_schedule, EVAL_METRIC_REWARD, EVAL_METRIC_F1, MAX_EVAL_TIME_PER_EPISODE
-from vimms_gym.evaluation import evaluate
+from vimms_gym.common import linear_schedule, EVAL_METRIC_REWARD, EVAL_METRIC_F1, \
+    MAX_EVAL_TIME_PER_EPISODE, evaluate
 
 
 def sample_dqn_params(trial, tune_model, tune_reward):

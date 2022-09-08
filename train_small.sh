@@ -3,7 +3,9 @@
 env_name="DDAEnv"
 repeat=5
 timesteps=5E5
-results="notebooks/QCB_chems_small"
+verbose=2
+preset="QCB_chems_small"
+results="notebooks/${preset}"
 model_name="DQN"
 
 ### Balanced ###
@@ -16,7 +18,7 @@ for (( i=0; i<=${repeat}; i++ ))
 do
     out_file="${env_name}_${model_name}_${model_type}_${i}.zip"    
     echo "Training ${out_file}"
-    python training.py --preset QCB_chems_small --model DQN --timesteps ${timesteps} --results ${results} --alpha ${alpha} --beta ${beta} --out_file ${out_file}
+    python training.py --preset QCB_chems_small --model DQN --timesteps ${timesteps} --results ${results} --alpha ${alpha} --beta ${beta} --out_file ${out_file} --verbose {verbose}
 done
 
 ### Intensity ###
@@ -29,7 +31,7 @@ for (( i=0; i<=${repeat}; i++ ))
 do
     out_file="${env_name}_${model_name}_${model_type}_${i}.zip"    
     echo "Training ${out_file}"
-    python training.py --preset QCB_chems_small --model DQN --timesteps ${timesteps} --results ${results} --alpha ${alpha} --beta ${beta} --out_file ${out_file}
+    python training.py --preset QCB_chems_small --model DQN --timesteps ${timesteps} --results ${results} --alpha ${alpha} --beta ${beta} --out_file ${out_file} --verbose {verbose}
 done
 
 ### Coverage ###
@@ -42,5 +44,5 @@ for (( i=0; i<=${repeat}; i++ ))
 do
     out_file="${env_name}_${model_name}_${model_type}_${i}.zip"    
     echo "Training ${out_file}"
-    python training.py --preset QCB_chems_small --model DQN --timesteps ${timesteps} --results ${results} --alpha ${alpha} --beta ${beta} --out_file ${out_file}
+    python training.py --preset QCB_chems_small --model DQN --timesteps ${timesteps} --results ${results} --alpha ${alpha} --beta ${beta} --out_file ${out_file} --verbose {verbose}
 done

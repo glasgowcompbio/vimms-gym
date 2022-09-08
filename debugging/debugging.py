@@ -17,8 +17,7 @@ from stable_baselines3.common.monitor import Monitor
 
 from vimms.Evaluation import EvaluationData
 from vimms_gym.env import DDAEnv
-from vimms_gym.common import EVAL_METRIC_REWARD, HISTORY_HORIZON
-from vimms_gym.evaluation import evaluate
+from vimms_gym.common import EVAL_METRIC_REWARD, HISTORY_HORIZON, evaluate
 
 from tune import TrialEvalCallback
 from experiments import preset_qcb_small
