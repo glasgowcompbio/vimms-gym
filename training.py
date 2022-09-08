@@ -164,7 +164,7 @@ class Objective(object):
             pass
 
         # Create the RL model
-        env = make_environment(self.max_peaks, self.params)
+        env = make_environment(self.max_peaks, self.params, self.horizon)
         model = init_model(self.model_name, model_params, env, out_dir=self.out_dir,
                            verbose=self.verbose)
 
