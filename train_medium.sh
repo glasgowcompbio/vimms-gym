@@ -21,7 +21,7 @@ do
       do
         out_file="${env_name}_${model_name}_alpha_${alpha}_beta_${beta}_horizon_${horizon}.zip"
         echo "Training ${out_file}"
-        python training.py --preset {preset} --model ${model_name} --timesteps ${timesteps} --results ${results} --verbose ${verbose} --out_file ${out_file} --horizon ${horizon}
+        python training.py --preset ${preset} --model ${model_name} --timesteps ${timesteps} --results ${results} --verbose ${verbose} --out_file ${out_file} --horizon ${horizon}
       done
     done
   done
