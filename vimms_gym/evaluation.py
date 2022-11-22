@@ -52,7 +52,7 @@ class Episode():
 def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                N=10, min_ms1_intensity=5000, model=None,
                print_eval=False, print_reward=False, mzml_prefix=None,
-               intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD):
+               intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD, horizon=HISTORY_HORIZON):
 
     if METHOD_DQN in method:
         assert model is not None
@@ -69,7 +69,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
         env = DDAEnv(max_peaks, env_params)
         env = flatten_dict_observations(env)
-        env = HistoryWrapper(env, horizon=HISTORY_HORIZON)    
+        env = HistoryWrapper(env, horizon=horizon)
         obs = env.reset(chems=chems)
         states = None
         done = False
