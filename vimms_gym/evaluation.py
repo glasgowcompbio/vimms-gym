@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from vimms.Evaluation import EvaluationData
 
@@ -52,7 +54,8 @@ class Episode():
 def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                N=10, min_ms1_intensity=5000, model=None,
                print_eval=False, print_reward=False, mzml_prefix=None,
-               intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD, horizon=HISTORY_HORIZON):
+               intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD, horizon=HISTORY_HORIZON,
+               write_mzML=True):
 
     if METHOD_DQN in method:
         assert model is not None
@@ -63,6 +66,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
     all_episodic_results = []
 
     for i in range(len(chem_list)):
+        start_time = time.time()
         chems = chem_list[i]
         if print_reward:
             print(f'\nEpisode {i} ({len(chems)} chemicals)')
@@ -101,14 +105,16 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                 break
 
         if print_reward:
+            delta = time.time() - start_time
             print(
-                f'Finished after {episode.num_steps} timesteps with '
+                f'Finished after {episode.num_steps} timesteps ({delta} seconds) with '
                 f'total reward {episode.get_total_rewards()}')
 
         # save mzML and other info useful for evaluation of the ViMMS environment
-        mzml_name = mzml_prefix if not None else method
-        out_file = '%s_%d.mzML' % (mzml_name, i)
-        env.write_mzML(out_dir, out_file)
+        if write_mzML:
+            mzml_name = mzml_prefix if mzml_prefix is not None else method
+            out_file = '%s_%d.mzML' % (mzml_name, i)
+            env.write_mzML(out_dir, out_file)
 
         # environment will be evaluated here
         eval_res = episode.evaluate_environment(env, intensity_threshold)

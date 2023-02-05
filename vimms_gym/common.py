@@ -107,7 +107,8 @@ def evaluate(env, intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD, format_output
         vimms_env = env
 
     # call vimms codes to compute various statistics
-    vimms_env_res = evaluate_simulated_env(vimms_env)
+    evaluator = evaluate_simulated_env(vimms_env)
+    vimms_env_res = evaluator.evaluation_report()
     count_fragmented = np.count_nonzero(vimms_env_res['times_fragmented'])
     count_ms1 = len(vimms_env.controller.scans[1])
     count_ms2 = len(vimms_env.controller.scans[2])
