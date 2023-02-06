@@ -45,6 +45,8 @@ class Episode():
         self.eval_res = evaluate(vimms_env, intensity_threshold)
         self.eval_res['total_rewards'] = sum(self.rewards)
         self.eval_res['invalid_action_count'] = env.invalid_action_count
+        self.eval_res['num_ms1_scans'] = len(vimms_env.controller.scans[1])
+        self.eval_res['num_ms2_scans'] = len(vimms_env.controller.scans[2])
         return self.eval_res
 
     def get_total_rewards(self):

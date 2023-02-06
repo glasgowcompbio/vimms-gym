@@ -344,10 +344,12 @@ class DDAEnv(gym.Env):
         """
         excluded = 0.0
         boxes = self.exclusion.exclusion_list.check_point(mz, current_rt)
-        if len(boxes) > 0:
+        if len(boxes) == 1: # most likely case
+            last_frag_at = boxes.pop().frag_at
+            excluded = current_rt - last_frag_at
+        elif len(boxes) > 0: # almost never happens
             frag_ats = [b.frag_at for b in boxes]
             last_frag_at = min(frag_ats)
-            # print(mz, current_rt, last_frag_at)
             excluded = current_rt - last_frag_at
 
         excluded = clip_value(excluded, self.rt_tol)

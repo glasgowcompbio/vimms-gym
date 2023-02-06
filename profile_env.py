@@ -10,6 +10,9 @@ from vimms_gym.common import METHOD_TOPN, EVAL_F1_INTENSITY_THRESHOLD
 from vimms_gym.env import DDAEnv
 from vimms_gym.evaluation import run_method
 
+import numpy as np
+np.random.seed(0)
+
 preset = "QCB_resimulated_medium"
 model_name = "DQN"
 alpha = 0.25
@@ -39,11 +42,17 @@ fname = os.path.join('notebooks', 'QCB_resimulated_medium', 'QCB_chems_medium.p'
 chem_list = load_obj(fname)
 chem_list = [chem_list[0]]
 method = METHOD_TOPN
-out_dir = None
+out_dir = 'profile'
 HISTORY_HORIZON = 4
 
-run_method(None, params, max_peaks, chem_list, method, out_dir,
+results = run_method(None, params, max_peaks, chem_list, method, out_dir,
            N=10, min_ms1_intensity=5000, model=None,
            print_eval=True, print_reward=True, mzml_prefix=None,
            intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD, horizon=HISTORY_HORIZON,
            write_mzML=False)
+
+num_ms1_scans = results[0].eval_res['num_ms1_scans']
+num_ms2_scans = results[0].eval_res['num_ms2_scans']
+print(num_ms1_scans, num_ms2_scans)
+assert(num_ms1_scans == 788)
+assert(num_ms2_scans == 426)
