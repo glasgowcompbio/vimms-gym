@@ -54,10 +54,13 @@ def obs_to_dfs(obs, features):
 
     # set the original log intensity values to scan_df too
     log_intensities = np.zeros(len(scan_df))
+    fragmented = np.zeros(len(scan_df))
     for i in range(len(features)):
         f = features[i]
         log_intensities[i] = np.log(f.original_intensity)
+        fragmented[i] = 1 if f.fragmented else 0
     scan_df['log_intensities'] = log_intensities
+    scan_df['fragmented'] = fragmented
 
     # create a dataframe to hold various counts
     count_df = pd.DataFrame(count_obs)

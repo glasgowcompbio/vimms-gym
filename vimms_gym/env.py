@@ -72,7 +72,6 @@ class DDAEnv(gym.Env):
         combined_spaces = spaces.Dict({
             # precursor ion features
             'intensities': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'fragmented': spaces.MultiBinary(self.max_peaks),
             'excluded': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
 
             # roi features
@@ -112,7 +111,6 @@ class DDAEnv(gym.Env):
         features = {
             # precursor ion features
             'intensities': np.zeros(self.max_peaks, dtype=np.float32),
-            'fragmented': np.zeros(self.max_peaks, dtype=np.float32),
             'excluded': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi features
@@ -206,7 +204,6 @@ class DDAEnv(gym.Env):
             for i in range(len(features)):
                 f = features[i]
                 state['intensities'][i] = f.scaled_intensity
-                state['fragmented'][i] = 0 if not f.fragmented else 1
                 state['excluded'][i] = f.excluded
                 state['valid_actions'][i] = 1  # fragmentable
                 self._update_roi(f, i, state)  # update ROI information for this feature
@@ -223,9 +220,6 @@ class DDAEnv(gym.Env):
 
             # store last action
             self.last_action = idx
-
-            # update fragmented flag
-            state['fragmented'][idx] = 1
 
             # it's no longer valid to fragment this peak again
             state['valid_actions'][idx] = 0
@@ -357,22 +351,30 @@ class DDAEnv(gym.Env):
 
     def _update_counts(self, state):
 
+        num_features = len(self.features)
+
+        arr = state['valid_actions'][:self.max_peaks]
+        fragmented = np.logical_not(arr).astype(int)
+        fragmented[num_features:] = 0 # peaks that do not exist cannot be fragmented
+
         # count fragmented
-        fragmented_count = np.count_nonzero(state['fragmented'] > 0)
+        fragmented_count = np.count_nonzero(fragmented[:num_features] > 0)
 
         # count unfragmented
-        unfragmented_count = np.count_nonzero(state['fragmented'] == 0)
+        unfragmented_count = np.count_nonzero(fragmented[:num_features] == 0)
+
+        excluded = state['excluded']
 
         # count excluded
-        excluded_count = np.count_nonzero(state['excluded'] > 0)
+        excluded_count = np.count_nonzero(excluded[:num_features] > 0)
 
         # count non-excluded
-        unexcluded_count = np.count_nonzero(state['excluded'] == 0)
+        unexcluded_count = np.count_nonzero(excluded[:num_features] == 0)
 
-        state['fragmented_count'][0] = clip_value(fragmented_count, self.max_peaks)
-        state['unfragmented_count'][0] = clip_value(unfragmented_count, self.max_peaks)
-        state['excluded_count'][0] = clip_value(excluded_count, self.max_peaks)
-        state['unexcluded_count'][0] = clip_value(unexcluded_count, self.max_peaks)
+        state['fragmented_count'][0] = clip_value(fragmented_count, num_features)
+        state['unfragmented_count'][0] = clip_value(unfragmented_count, num_features)
+        state['excluded_count'][0] = clip_value(excluded_count, num_features)
+        state['unexcluded_count'][0] = clip_value(unexcluded_count, num_features)
         state['elapsed_scans_since_start'][0] = clip_value(
             self.elapsed_scans_since_start, 10000)
         state['elapsed_scans_since_last_ms1'][0] = clip_value(
