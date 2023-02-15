@@ -90,12 +90,12 @@ class DDAEnv(gym.Env):
             'roi_intensities_2': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'roi_intensities_3': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
             'roi_intensities_4': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_5': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),            
+            'roi_intensities_5': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
 
             # valid action indicators, last action and current ms level
             'valid_actions': spaces.MultiBinary(self.in_dim),
-            'last_action': spaces.Discrete(self.in_dim+1),
-            'ms_level': spaces.Discrete(2), # either MS1 or MS2 scans
+            'last_action': spaces.Discrete(self.in_dim + 1),
+            'ms_level': spaces.Discrete(2),  # either MS1 or MS2 scans
 
             # various other counts
             'fragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
@@ -124,7 +124,7 @@ class DDAEnv(gym.Env):
             'roi_intensities_2': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_intensities_3': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_intensities_4': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensities_5': np.zeros(self.max_peaks, dtype=np.float32),                
+            'roi_intensities_5': np.zeros(self.max_peaks, dtype=np.float32),
 
             # valid action indicators
             'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
@@ -149,6 +149,22 @@ class DDAEnv(gym.Env):
         self._update_counts(state)
         return state
 
+    def _scale_intensities(self, intensity_values):
+
+        if np.all(intensity_values == 0):
+            # If all the input values are zero, return it
+            return intensity_values
+
+        # Log-transform the intensity values
+        intensity_values += 1E-12
+        log_intensity_values = np.log(intensity_values)
+
+        # Scale the log-transformed intensity values to be between 0 and 1
+        scaled_intensity_values = (log_intensity_values - np.min(log_intensity_values)) / (
+                    np.max(log_intensity_values) - np.min(log_intensity_values))
+
+        return scaled_intensity_values
+
     def _scan_to_state(self, dda_action, scan_to_process):
         # TODO: can be moved into its own class?
 
@@ -170,10 +186,11 @@ class DDAEnv(gym.Env):
             # get the N most intense features first
             features = []
             sorted_indices = np.flip(intensities.argsort())
+            scaled_intensities = self._scale_intensities(intensities)
             for i in sorted_indices[0:self.max_peaks]:
                 mz = mzs[i]
                 original_intensity = intensities[i]
-                scaled_intensity = scale_intensity(original_intensity)
+                scaled_intensity = scaled_intensities[i]
 
                 # initially nothing has been fragmented
                 fragmented = False
@@ -201,12 +218,25 @@ class DDAEnv(gym.Env):
             # convert features to state
             assert len(features) <= self.max_peaks
             state = self._initial_state()
+
             for i in range(len(features)):
                 f = features[i]
                 state['intensities'][i] = f.scaled_intensity
                 state['excluded'][i] = f.excluded
                 state['valid_actions'][i] = 1  # fragmentable
                 self._update_roi(f, i, state)  # update ROI information for this feature
+
+            state['roi_intensity_at_last_frag'] = self._scale_intensities(
+                state['roi_intensity_at_last_frag'])
+            state['roi_min_intensity_since_last_frag'] = self._scale_intensities(
+                state['roi_min_intensity_since_last_frag'])
+            state['roi_max_intensity_since_last_frag'] = self._scale_intensities(
+                state['roi_max_intensity_since_last_frag'])
+
+            state['roi_intensities_2'] = self._scale_intensities(state['roi_intensities_2'])
+            state['roi_intensities_3'] = self._scale_intensities(state['roi_intensities_3'])
+            state['roi_intensities_4'] = self._scale_intensities(state['roi_intensities_4'])
+            state['roi_intensities_5'] = self._scale_intensities(state['roi_intensities_5'])
 
             state['ms_level'] = 0
             self.elapsed_scans_since_last_ms1 = 0
@@ -273,22 +303,19 @@ class DDAEnv(gym.Env):
 
         try:
             # intensity of this ROI at last fragmentation
-            val = roi.intensity_list[roi.fragmented_index]
-            roi_intensity_at_last_frag = scale_intensity(val)
+            roi_intensity_at_last_frag = roi.intensity_list[roi.fragmented_index]
         except AttributeError:  # no ROI object, or never been fragmented
             roi_intensity_at_last_frag = 0.0
 
         try:
             # minimum intensity of this ROI since last fragmentation
-            val = min(roi.intensity_list[roi.fragmented_index:])
-            roi_min_intensity_since_last_frag = scale_intensity(val)
+            roi_min_intensity_since_last_frag = min(roi.intensity_list[roi.fragmented_index:])
         except AttributeError:  # no ROI object, or never been fragmented
             roi_min_intensity_since_last_frag = 0.0
 
         try:
             # maximum intensity of this ROI since last fragmentation
-            val = max(roi.intensity_list[roi.fragmented_index:])
-            roi_max_intensity_since_last_frag = scale_intensity(val)
+            roi_max_intensity_since_last_frag = max(roi.intensity_list[roi.fragmented_index:])
         except AttributeError:  # no ROI object, or never been fragmented
             roi_max_intensity_since_last_frag = 0.0
 
@@ -301,22 +328,22 @@ class DDAEnv(gym.Env):
         if roi is not None:
             intensities = roi.intensity_list
             try:
-                roi_intensities_2 = scale_intensity(intensities[-2])
+                roi_intensities_2 = intensities[-2]
             except IndexError:
                 pass
 
             try:
-                roi_intensities_3 = scale_intensity(intensities[-3])
+                roi_intensities_3 = intensities[-3]
             except IndexError:
                 pass
 
             try:
-                roi_intensities_4 = scale_intensity(intensities[-4])
+                roi_intensities_4 = intensities[-4]
             except IndexError:
                 pass
 
             try:
-                roi_intensities_5 = scale_intensity(intensities[-5])
+                roi_intensities_5 = intensities[-5]
             except IndexError:
                 pass
 
@@ -329,7 +356,7 @@ class DDAEnv(gym.Env):
         state['roi_intensities_2'][i] = roi_intensities_2
         state['roi_intensities_3'][i] = roi_intensities_3
         state['roi_intensities_4'][i] = roi_intensities_4
-        state['roi_intensities_5'][i] = roi_intensities_5        
+        state['roi_intensities_5'][i] = roi_intensities_5
 
     def _get_elapsed_time_since_exclusion(self, mz, current_rt):
         """
@@ -338,10 +365,10 @@ class DDAEnv(gym.Env):
         """
         excluded = 0.0
         boxes = self.exclusion.exclusion_list.check_point(mz, current_rt)
-        if len(boxes) == 1: # most likely case
+        if len(boxes) == 1:  # most likely case
             last_frag_at = boxes.pop().frag_at
             excluded = current_rt - last_frag_at
-        elif len(boxes) > 0: # almost never happens
+        elif len(boxes) > 0:  # almost never happens
             frag_ats = [b.frag_at for b in boxes]
             last_frag_at = min(frag_ats)
             excluded = current_rt - last_frag_at
@@ -355,7 +382,7 @@ class DDAEnv(gym.Env):
 
         arr = state['valid_actions'][:self.max_peaks]
         fragmented = np.logical_not(arr).astype(int)
-        fragmented[num_features:] = 0 # peaks that do not exist cannot be fragmented
+        fragmented[num_features:] = 0  # peaks that do not exist cannot be fragmented
 
         # count fragmented
         fragmented_count = np.count_nonzero(fragmented[:num_features] > 0)
@@ -556,7 +583,7 @@ class DDAEnv(gym.Env):
                     # compute the overall reward
                     intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
                     intensity_reward = intensity_reward / chem.max_intensity
-                    reward = (self.alpha * coverage_reward) + ((1-self.alpha) * intensity_reward)
+                    reward = (self.alpha * coverage_reward) + ((1 - self.alpha) * intensity_reward)
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
