@@ -7,6 +7,7 @@ import pylab as plt
 from gym import spaces
 from loguru import logger
 from matplotlib.backends.backend_agg import FigureCanvasAgg
+from sklearn.preprocessing import StandardScaler
 from vimms.Common import set_log_level_warning
 from vimms.Controller import AgentBasedController
 from vimms.Environment import Environment
@@ -20,7 +21,8 @@ from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, \
     MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
     RENDER_RGB_ARRAY, render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, \
-    EVAL_F1_INTENSITY_THRESHOLD, evaluate, scale_intensity
+    EVAL_F1_INTENSITY_THRESHOLD, evaluate, scale_intensity, CLIPPED_INTENSITY_LOW, \
+    CLIPPED_INTENSITY_HIGH
 
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
@@ -69,9 +71,11 @@ class DDAEnv(gym.Env):
         """
         Defines observation spaces of m/z, RT and intensity values
         """
+        lo = CLIPPED_INTENSITY_LOW
+        hi = CLIPPED_INTENSITY_HIGH
         combined_spaces = spaces.Dict({
             # precursor ion features
-            'intensities': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'intensities': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
             'excluded': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
 
             # roi features
@@ -80,17 +84,17 @@ class DDAEnv(gym.Env):
             'roi_elapsed_time_since_last_frag': spaces.Box(
                 low=0, high=1, shape=(self.max_peaks,)),
             'roi_intensity_at_last_frag': spaces.Box(
-                low=0, high=1, shape=(self.max_peaks,)),
+                low=lo, high=hi, shape=(self.max_peaks,)),
             'roi_min_intensity_since_last_frag': spaces.Box(
-                low=0, high=1, shape=(self.max_peaks,)),
+                low=lo, high=hi, shape=(self.max_peaks,)),
             'roi_max_intensity_since_last_frag': spaces.Box(
-                low=0, high=1, shape=(self.max_peaks,)),
+                low=lo, high=hi, shape=(self.max_peaks,)),
 
             # roi intensity features
-            'roi_intensities_2': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_3': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_4': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensities_5': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensities_2': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_intensities_3': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_intensities_4': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_intensities_5': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
 
             # valid action indicators, last action and current ms level
             'valid_actions': spaces.MultiBinary(self.in_dim),
@@ -149,21 +153,38 @@ class DDAEnv(gym.Env):
         self._update_counts(state)
         return state
 
-    def _scale_intensities(self, intensity_values):
+    def _scale_intensities(self, intensity_values, num_features):
 
         if np.all(intensity_values == 0):
             # If all the input values are zero, return it
             return intensity_values
 
-        # Log-transform the intensity values
-        intensity_values += 1E-12
-        log_intensity_values = np.log(intensity_values)
+        # operate only on the slice actually containing peak data
+        arr = intensity_values[:num_features]
+
+        # Identify non-zero values using a boolean mask
+        # Apply log transform only to non-zero values
+        nonzero_mask = arr != 0
+        log_intensity_values = np.zeros_like(arr)
+        log_intensity_values[nonzero_mask] = np.log(arr[nonzero_mask])
 
         # Scale the log-transformed intensity values to be between 0 and 1
         scaled_intensity_values = (log_intensity_values - np.min(log_intensity_values)) / (
                     np.max(log_intensity_values) - np.min(log_intensity_values))
 
-        return scaled_intensity_values
+        # z-score normalisation
+        # if using this, don't forget to clip between -3 and 3
+        # scaler = StandardScaler()
+        # scaled_intensity_values = scaler.fit_transform(
+        #     log_intensity_values[:, np.newaxis])  # don't forget to reshape to 2D array
+
+        # clip the intensity values
+        clipped_intensity_values = np.clip(scaled_intensity_values, CLIPPED_INTENSITY_LOW,
+                                           CLIPPED_INTENSITY_HIGH).flatten()
+
+        # set the calculation back to intensity_values
+        intensity_values[:num_features] = clipped_intensity_values
+        return intensity_values
 
     def _scan_to_state(self, dda_action, scan_to_process):
         # TODO: can be moved into its own class?
@@ -186,11 +207,9 @@ class DDAEnv(gym.Env):
             # get the N most intense features first
             features = []
             sorted_indices = np.flip(intensities.argsort())
-            scaled_intensities = self._scale_intensities(intensities)
             for i in sorted_indices[0:self.max_peaks]:
                 mz = mzs[i]
                 original_intensity = intensities[i]
-                scaled_intensity = scaled_intensities[i]
 
                 # initially nothing has been fragmented
                 fragmented = False
@@ -210,33 +229,40 @@ class DDAEnv(gym.Env):
                     # for roi in self.roi_builder.live_roi:
                     #     print('%s: %s' % (roi, roi.get_last_datum()))
 
-                feature = Feature(mz, rt, original_intensity, scaled_intensity,
+                feature = Feature(mz, rt, original_intensity, None,
                                   fragmented, excluded, roi)
                 features.append(feature)
             self.features = features
 
             # convert features to state
-            assert len(features) <= self.max_peaks
+            num_features = len(features)
+            assert num_features <= self.max_peaks
             state = self._initial_state()
 
-            for i in range(len(features)):
+            for i in range(num_features):
                 f = features[i]
-                state['intensities'][i] = f.scaled_intensity
+                state['intensities'][i] = f.original_intensity
                 state['excluded'][i] = f.excluded
                 state['valid_actions'][i] = 1  # fragmentable
                 self._update_roi(f, i, state)  # update ROI information for this feature
 
+            state['intensities'] = self._scale_intensities(
+                state['intensities'], num_features)
             state['roi_intensity_at_last_frag'] = self._scale_intensities(
-                state['roi_intensity_at_last_frag'])
+                state['roi_intensity_at_last_frag'], num_features)
             state['roi_min_intensity_since_last_frag'] = self._scale_intensities(
-                state['roi_min_intensity_since_last_frag'])
+                state['roi_min_intensity_since_last_frag'], num_features)
             state['roi_max_intensity_since_last_frag'] = self._scale_intensities(
-                state['roi_max_intensity_since_last_frag'])
+                state['roi_max_intensity_since_last_frag'], num_features)
 
-            state['roi_intensities_2'] = self._scale_intensities(state['roi_intensities_2'])
-            state['roi_intensities_3'] = self._scale_intensities(state['roi_intensities_3'])
-            state['roi_intensities_4'] = self._scale_intensities(state['roi_intensities_4'])
-            state['roi_intensities_5'] = self._scale_intensities(state['roi_intensities_5'])
+            state['roi_intensities_2'] = self._scale_intensities(
+                state['roi_intensities_2'], num_features)
+            state['roi_intensities_3'] = self._scale_intensities(
+                state['roi_intensities_3'], num_features)
+            state['roi_intensities_4'] = self._scale_intensities(
+                state['roi_intensities_4'], num_features)
+            state['roi_intensities_5'] = self._scale_intensities(
+                state['roi_intensities_5'], num_features)
 
             state['ms_level'] = 0
             self.elapsed_scans_since_last_ms1 = 0

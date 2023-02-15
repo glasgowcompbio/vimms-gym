@@ -45,6 +45,8 @@ EVAL_METRIC_INTENSITY_PROP = 'intensity_prop'
 EVAL_METRIC_MS1_MS2_RATIO = 'ms1ms2_ratio'
 EVAL_METRIC_EFFICIENCY = 'efficiency'
 
+CLIPPED_INTENSITY_LOW  = 0
+CLIPPED_INTENSITY_HIGH = 1
 
 def clip_value(value, max_value, min_range=0.0, max_range=1.0):
     '''
