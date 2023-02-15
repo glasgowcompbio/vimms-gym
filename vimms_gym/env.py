@@ -22,7 +22,7 @@ from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, \
     MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
     RENDER_RGB_ARRAY, render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, \
     EVAL_F1_INTENSITY_THRESHOLD, evaluate, scale_intensity, CLIPPED_INTENSITY_LOW, \
-    CLIPPED_INTENSITY_HIGH
+    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY
 
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
@@ -169,21 +169,10 @@ class DDAEnv(gym.Env):
         log_intensity_values[nonzero_mask] = np.log(arr[nonzero_mask])
 
         # Scale the log-transformed intensity values to be between 0 and 1
-        # scaled_intensity_values = (log_intensity_values - np.min(log_intensity_values)) / (
-        #             np.max(log_intensity_values) - np.min(log_intensity_values))
-
-        # z-score normalisation
-        # if using this, don't forget to clip between -3 and 3
-        scaler = StandardScaler()
-        scaled_intensity_values = scaler.fit_transform(
-            log_intensity_values[:, np.newaxis])  # don't forget to reshape to 2D array
-
-        # clip the intensity values
-        clipped_intensity_values = np.clip(scaled_intensity_values, CLIPPED_INTENSITY_LOW,
-                                           CLIPPED_INTENSITY_HIGH).flatten()
+        scaled_intensity_values = log_intensity_values / MAX_OBSERVED_LOG_INTENSITY
 
         # set the calculation back to intensity_values
-        intensity_values[:num_features] = clipped_intensity_values
+        intensity_values[:num_features] = scaled_intensity_values
         return intensity_values
 
     def _scan_to_state(self, dda_action, scan_to_process):
