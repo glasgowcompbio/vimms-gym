@@ -2,13 +2,13 @@
 
 env_name="DDAEnv"
 model_name="DQN"
-timesteps=20E6
+timesteps=1E6
 repeat=1
 verbose=2
 preset="QCB_resimulated_medium"
 alphas=( 0.50 )
 betas=( 0.50 )
-horizons=( 1 2 4 8 )
+horizons=( 4 )
 
 for (( i=0; i<${repeat}; i++ ))
 do
