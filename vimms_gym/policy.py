@@ -37,6 +37,7 @@ def topN_policy(obs, features, N, min_ms1_intensity):
     A policy function that performs TopN selection from the observation.
     """
     # turn observation dictionary to dataframe
+    # print(obs)
     scan_df, count_df = obs_to_dfs(obs, features)
 
     # set an indicator column for min intensity check
