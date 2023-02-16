@@ -170,6 +170,7 @@ class DDAEnv(gym.Env):
 
         # Scale the log-transformed intensity values to be between 0 and 1
         scaled_intensity_values = log_intensity_values / MAX_OBSERVED_LOG_INTENSITY
+        scaled_intensity_values = np.clip(scaled_intensity_values, 0, 1)
 
         # set the calculation back to intensity_values
         intensity_values[:num_features] = scaled_intensity_values
