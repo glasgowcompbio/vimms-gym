@@ -207,6 +207,10 @@ def generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals, mz_range
     samplers_pickle_suffix = 'extracted' if extract_chromatograms else 'gaussian'
 
     base_dir = '../..'
+    mzml_filename = os.path.abspath(os.path.join(base_dir, 'notebooks', 'fullscan_QCB.mzML'))
+    if not exists(mzml_filename): # try another location
+        base_dir = '.'
+
     samplers_pickle = os.path.abspath(os.path.join(base_dir,
                                                    'pickles', '%s_%s.p' % (samplers_pickle_prefix,
                                                                            samplers_pickle_suffix)))
