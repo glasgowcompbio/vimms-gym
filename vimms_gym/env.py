@@ -7,7 +7,6 @@ import pylab as plt
 from gym import spaces
 from loguru import logger
 from matplotlib.backends.backend_agg import FigureCanvasAgg
-from sklearn.preprocessing import StandardScaler
 from vimms.Common import set_log_level_warning
 from vimms.Controller import AgentBasedController
 from vimms.Environment import Environment
@@ -17,13 +16,11 @@ from vimms.Roi import RoiBuilder, SmartRoiParams, RoiBuilderParams
 
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
-
 from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, \
     MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
     RENDER_RGB_ARRAY, render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, \
-    EVAL_F1_INTENSITY_THRESHOLD, evaluate, scale_intensity, CLIPPED_INTENSITY_LOW, \
+    CLIPPED_INTENSITY_LOW, \
     CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY
-
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -49,6 +46,7 @@ class DDAEnv(gym.Env):
 
         self.mz_tol = self.env_params['mz_tol']
         self.rt_tol = self.env_params['rt_tol']
+        self.min_ms1_intensity = self.env_params['min_ms1_intensity']
         self.isolation_window = self.env_params['isolation_window']
 
         try:
@@ -212,7 +210,8 @@ class DDAEnv(gym.Env):
                     last_datum = (mz, rt, original_intensity)
                     roi = last_datum_to_roi[last_datum]
                 except KeyError:
-                    # FIXME: this shouldn't happen??!
+                    # This happens only for noise peaks, which as no associated chemical
+                    # TODO: I think we should handle this better?
                     roi = None
 
                     # print('Missing: %f %f %f' % last_datum)
@@ -234,6 +233,8 @@ class DDAEnv(gym.Env):
                 state['intensities'][i] = f.original_intensity
                 state['excluded'][i] = f.excluded
                 state['valid_actions'][i] = 1  # fragmentable
+                if f.original_intensity < self.min_ms1_intensity:
+                    state['valid_actions'][i] = 0 # except when it's below min ms1 intensity
                 self._update_roi(f, i, state)  # update ROI information for this feature
 
             state['intensities'] = self._scale_intensities(
@@ -509,6 +510,7 @@ class DDAEnv(gym.Env):
         # target a particular ion for MS2 fragmentation
         is_valid = True
         if action == self.max_peaks:
+            # ms1 action is always valid
             dda_action = self.controller.agent.target_ms1()
         else:
             # 0 .. N-1 is the index of precursor ion to fragment
@@ -520,11 +522,15 @@ class DDAEnv(gym.Env):
             target_original_intensity = 0
             target_scaled_intensity = 0
             try:
-                # check if targeting a feature that has been fragmented before
                 f = self.features[idx]
                 if f.fragmented:
+                    # check if targeting a feature that has been fragmented before
+                    is_valid = False
+                elif f.original_intensity < self.min_ms1_intensity:
+                    # check if targeting a feature below min intensity
                     is_valid = False
                 else:
+                    # valid MS2 target
                     target_mz = f.mz
                     target_rt = f.rt
                     target_original_intensity = f.original_intensity
