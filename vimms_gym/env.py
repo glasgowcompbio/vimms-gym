@@ -74,6 +74,7 @@ class DDAEnv(gym.Env):
         combined_spaces = spaces.Dict({
             # precursor ion features
             'intensities': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            'fragmented': spaces.MultiBinary(self.max_peaks),
             'excluded': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
 
             # roi features
@@ -113,6 +114,7 @@ class DDAEnv(gym.Env):
         features = {
             # precursor ion features
             'intensities': np.zeros(self.max_peaks, dtype=np.float32),
+            'fragmented': np.zeros(self.max_peaks, dtype=np.float32),
             'excluded': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi features
@@ -231,6 +233,7 @@ class DDAEnv(gym.Env):
             for i in range(num_features):
                 f = features[i]
                 state['intensities'][i] = f.original_intensity
+                state['fragmented'][i] = 0 if not f.fragmented else 1
                 state['excluded'][i] = f.excluded
                 state['valid_actions'][i] = 1  # fragmentable
                 if f.original_intensity < self.min_ms1_intensity:
@@ -267,6 +270,9 @@ class DDAEnv(gym.Env):
 
             # store last action
             self.last_action = idx
+
+            # update fragmented flag
+            state['fragmented'][idx] = 1
 
             # it's no longer valid to fragment this peak again
             state['valid_actions'][idx] = 0
@@ -396,10 +402,7 @@ class DDAEnv(gym.Env):
     def _update_counts(self, state):
 
         num_features = len(self.features)
-
-        arr = state['valid_actions'][:self.max_peaks]
-        fragmented = np.logical_not(arr).astype(int)
-        fragmented[num_features:] = 0  # peaks that do not exist cannot be fragmented
+        fragmented = state['fragmented']
 
         # count fragmented
         fragmented_count = np.count_nonzero(fragmented[:num_features] > 0)
