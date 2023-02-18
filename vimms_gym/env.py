@@ -721,7 +721,9 @@ class DDAEnv(gym.Env):
             coverage_reward = 0.0
 
         intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
-        intensity_reward = intensity_reward / chem.max_intensity
+        intensity_reward = np.log(intensity_reward) / MAX_OBSERVED_LOG_INTENSITY
+        intensity_reward = np.clip(intensity_reward, 0, 1)
+
         reward = (self.alpha * coverage_reward) + ((1 - self.alpha) * intensity_reward)
         return reward
 
