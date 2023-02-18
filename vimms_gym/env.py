@@ -609,7 +609,7 @@ class DDAEnv(gym.Env):
                 # compute ms1 reward
                 num_fragmented = self.elapsed_scans_since_last_ms1
                 num_total = len(self.features)
-                reward = self._calculate_ms1_reward(num_fragmented, num_total, MS1_REWARD_SHAPE)
+                reward = self._compute_ms1_reward(num_fragmented, num_total, MS1_REWARD_SHAPE)
 
             elif dda_action.ms_level == 2:
                 if frag_events is not None:  # some chemical has been fragmented
@@ -623,7 +623,7 @@ class DDAEnv(gym.Env):
                     chem = frag_event.chem
 
                     # compute ms2 reward
-                    reward = self._compute_ms2_reward(chem, chem_frag_int, reward)
+                    reward = self._compute_ms2_reward(chem, chem_frag_int)
 
                     # store new intensity into dictionary
                     self.frag_chem_intensity[chem] = chem_frag_int
@@ -635,7 +635,7 @@ class DDAEnv(gym.Env):
         assert -1.0 <= reward <= 1
         return reward
 
-    def _calculate_ms1_reward(self, num_fragmented, num_total, alpha):
+    def _compute_ms1_reward(self, num_fragmented, num_total, alpha):
         """
         Calculate the MS1 reward as a function of the number of precursor ions
         that have been fragmented, using a decreasing exponential function that
