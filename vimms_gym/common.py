@@ -5,6 +5,7 @@ import socket
 from vimms.Evaluation import evaluate_simulated_env
 
 MS1_REWARD = 0.1
+MS1_REWARD_SHAPE = 2
 INVALID_MOVE_REWARD = -1.0
 NO_FRAGMENTATION_REWARD = -100.0
 MAX_OBSERVED_INTENSITY = 1E20

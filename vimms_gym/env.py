@@ -17,10 +17,10 @@ from vimms.Roi import RoiBuilder, SmartRoiParams, RoiBuilderParams
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, \
-    MS1_REWARD, MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
+    MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
     RENDER_RGB_ARRAY, render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, \
     CLIPPED_INTENSITY_LOW, \
-    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY
+    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -241,7 +241,7 @@ class DDAEnv(gym.Env):
                 state['excluded_t1'][i] = f.excluded_t1
                 state['valid_actions'][i] = 1  # fragmentable
                 if f.original_intensity < self.min_ms1_intensity:
-                    state['valid_actions'][i] = 0 # except when it's below min ms1 intensity
+                    state['valid_actions'][i] = 0  # except when it's below min ms1 intensity
                 self._update_roi(f, i, state)  # update ROI information for this feature
 
             state['intensities'] = self._scale_intensities(
@@ -474,6 +474,7 @@ class DDAEnv(gym.Env):
         self.ms1_count = 0
         self.ms2_count = 0
         self.invalid_action_count = 0
+        self.num_fragmented = 0
 
         # track regions of interest
         smartroi_params = SmartRoiParams()
@@ -604,11 +605,12 @@ class DDAEnv(gym.Env):
             self.invalid_action_count += 1
         else:
 
-            # if ms1, give constant positive reward
             if dda_action.ms_level == 1:
-                reward = MS1_REWARD
+                # compute ms1 reward
+                num_fragmented = self.elapsed_scans_since_last_ms1
+                num_total = len(self.features)
+                reward = self._calculate_ms1_reward(num_fragmented, num_total, MS1_REWARD_SHAPE)
 
-            # if ms2, give fragmented chemical intensity as the reward
             elif dda_action.ms_level == 2:
                 if frag_events is not None:  # some chemical has been fragmented
 
@@ -619,26 +621,108 @@ class DDAEnv(gym.Env):
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
-                    if chem not in self.frag_chem_intensity:
-                        chem_last_frag_int = 0.0
-                        coverage_reward = 1.0
-                    else:
-                        chem_last_frag_int = self.frag_chem_intensity[chem]
-                        coverage_reward = 0.0
+
+                    # compute ms2 reward
+                    reward = self._compute_ms2_reward(chem, chem_frag_int, reward)
 
                     # store new intensity into dictionary
                     self.frag_chem_intensity[chem] = chem_frag_int
-
-                    # compute the overall reward
-                    intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
-                    intensity_reward = intensity_reward / chem.max_intensity
-                    reward = (self.alpha * coverage_reward) + ((1 - self.alpha) * intensity_reward)
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
                     reward = 0.0
 
         assert -1.0 <= reward <= 1
+        return reward
+
+    def _calculate_ms1_reward(self, num_fragmented, num_total, alpha):
+        """
+        Calculate the MS1 reward as a function of the number of precursor ions
+        that have been fragmented, using a decreasing exponential function that
+        assigns more weight to the early precursor ions and gradually decreases
+        the weight for the later ones.
+
+        Args:
+            num_fragmented (int): The number of precursor ions that have been
+                fragmented so far. This should be a non-negative integer less than
+                or equal to num_total.
+            num_total (int): The total number of precursor ions in the current
+                scan. This should be a positive integer.
+            alpha (float): A scaling parameter that controls the shape of the
+                reward function. A larger alpha value will result in a steeper
+                curve that assigns more weight to the early precursor ions, while
+                a smaller alpha value will result in a flatter curve that assigns
+                more equal weight to all precursor ions. This should be a positive
+                float.
+
+        Returns:
+            float: The MS1 reward for selecting an MS1 scan action, a value between
+            0 and 1. The reward is based on the fraction of precursor ions that have
+            been fragmented so far, using a decreasing exponential function that
+            assigns more weight to the early precursor ions and gradually decreases
+            the weight for the later ones.
+
+        The MS1 reward function implemented here is based on the formula:
+
+            reward = 1 - exp(-alpha * x)
+
+        where x is the fraction of precursor ions that have been fragmented so far,
+        calculated as num_fragmented / num_total. This formula corresponds to a
+        decreasing exponential function that assigns more weight to the early
+        precursor ions and gradually decreases the weight for the later ones.
+
+        If alpha is set to 0, the MS1 reward will be a linear function of the number
+        of precursor ions that have been fragmented, like the original reward
+        function. If alpha is set to infinity, the MS1 reward will be 1 if no
+        precursor ions have been fragmented and 0 if all precursor ions have been
+        fragmented, effectively preventing the selection of MS1 scan actions
+        altogether. A reasonable range for alpha depends on the specific application
+        and can be determined through experimentation or domain expertise.
+        """
+        x = num_fragmented / num_total
+        reward = 1 - np.exp(-alpha * x)
+        return reward
+
+    def _compute_ms2_reward(self, chem, chem_frag_int):
+        """
+        Compute the reward for selecting an MS2 fragmentation action for a given
+        precursor ion and fragmentation intensity.
+
+        Args:
+            chem (Chemical): A chemical object in ViMMS that were fragmented by
+                             selecting a precursor ion
+            chem_frag_int (float): The intensity of at which the fragmentation occured
+
+        Returns:
+            float: The MS2 reward, a value between 0 and 1. The reward is based on
+            two components: a coverage reward and an intensity reward. The coverage
+            reward is a constant reward of 1.0 if the chemical has not been
+            fragmented before, or 0.0 otherwise. The intensity reward is based on
+            the difference between the current fragmentation intensity and the
+            previous fragmentation intensity for the same chemical, multiplied
+            by a scaling parameter beta, and normalized by the maximum intensity
+            of the chemical. The intensity reward is weighted by a scaling
+            parameter alpha that controls the balance between coverage and intensity
+            rewards.
+
+        The MS2 reward function implemented here is based on the formula:
+
+            reward = alpha * coverage_reward + (1 - alpha) * intensity_reward
+
+        where alpha is a scaling parameter that controls the balance between coverage
+        and intensity rewards (should be between 0 and 1), and coverage_reward and
+        intensity_reward are calculated as follows:
+        """
+        if chem not in self.frag_chem_intensity:
+            chem_last_frag_int = 0.0
+            coverage_reward = 1.0
+        else:
+            chem_last_frag_int = self.frag_chem_intensity[chem]
+            coverage_reward = 0.0
+
+        intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
+        intensity_reward = intensity_reward / chem.max_intensity
+        reward = (self.alpha * coverage_reward) + ((1 - self.alpha) * intensity_reward)
         return reward
 
     def reset(self, chems=None):
