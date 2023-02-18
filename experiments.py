@@ -201,8 +201,9 @@ def preset_qcb_large(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
 def generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals, mz_range, rt_range,
                     intensity_range, extract_chromatograms, isolation_window=0.7, mz_tol=10,
-                    rt_tol=120, min_ms1_intensity=5000, ionisation_mode=POSITIVE,
-                    enable_spike_noise=True, noise_density=0.1, noise_max_val=1E3,
+                    exclusion_t0=5, exclusion_t1=120, min_ms1_intensity=5000,
+                    ionisation_mode=POSITIVE, enable_spike_noise=True,
+                    noise_density=0.1, noise_max_val=1E3,
                     min_roi_length=3, at_least_one_point_above=5E5):
     samplers_pickle_suffix = 'extracted' if extract_chromatograms else 'gaussian'
 
@@ -246,7 +247,8 @@ def generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals, mz_range
             'rt_range': rt_range,
             'isolation_window': isolation_window,
             'mz_tol': mz_tol,
-            'rt_tol': rt_tol,
+            'exclusion_t0': exclusion_t0,
+            'exclusion_t1': exclusion_t1,
             'min_ms1_intensity': min_ms1_intensity
         }
     }

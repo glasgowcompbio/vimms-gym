@@ -45,7 +45,8 @@ class DDAEnv(gym.Env):
         self.beta = BETA if 'beta' not in self.env_params else self.env_params['beta']
 
         self.mz_tol = self.env_params['mz_tol']
-        self.rt_tol = self.env_params['rt_tol']
+        self.exclusion_t0 = self.env_params['exclusion_t0']
+        self.exclusion_t1 = self.env_params['exclusion_t1']
         self.min_ms1_intensity = self.env_params['min_ms1_intensity']
         self.isolation_window = self.env_params['isolation_window']
 
@@ -75,7 +76,8 @@ class DDAEnv(gym.Env):
             # precursor ion features
             'intensities': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
             'fragmented': spaces.MultiBinary(self.max_peaks),
-            'excluded': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'excluded_t0': spaces.MultiBinary(self.max_peaks),
+            'excluded_t1': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
 
             # roi features
             'roi_length': spaces.Box(
@@ -115,7 +117,8 @@ class DDAEnv(gym.Env):
             # precursor ion features
             'intensities': np.zeros(self.max_peaks, dtype=np.float32),
             'fragmented': np.zeros(self.max_peaks, dtype=np.float32),
-            'excluded': np.zeros(self.max_peaks, dtype=np.float32),
+            'excluded_t0': np.zeros(self.max_peaks, dtype=np.float32),
+            'excluded_t1': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi features
             'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
@@ -206,7 +209,7 @@ class DDAEnv(gym.Env):
 
                 # update exclusion elapsed time for all features
                 current_rt = scan_to_process.rt
-                excluded = self._get_elapsed_time_since_exclusion(mz, current_rt)
+                excluded_t0, excluded_t1 = self._get_elapsed_time_since_exclusion(mz, current_rt)
 
                 try:
                     last_datum = (mz, rt, original_intensity)
@@ -221,7 +224,7 @@ class DDAEnv(gym.Env):
                     #     print('%s: %s' % (roi, roi.get_last_datum()))
 
                 feature = Feature(mz, rt, original_intensity, None,
-                                  fragmented, excluded, roi)
+                                  fragmented, excluded_t0, excluded_t1, roi)
                 features.append(feature)
             self.features = features
 
@@ -234,7 +237,8 @@ class DDAEnv(gym.Env):
                 f = features[i]
                 state['intensities'][i] = f.original_intensity
                 state['fragmented'][i] = 0 if not f.fragmented else 1
-                state['excluded'][i] = f.excluded
+                state['excluded_t0'][i] = f.excluded_t0
+                state['excluded_t1'][i] = f.excluded_t1
                 state['valid_actions'][i] = 1  # fragmentable
                 if f.original_intensity < self.min_ms1_intensity:
                     state['valid_actions'][i] = 0 # except when it's below min ms1 intensity
@@ -296,8 +300,10 @@ class DDAEnv(gym.Env):
             # update exclusion elapsed time for all features
             for i in range(len(self.features)):
                 f = self.features[i]
-                excluded = self._get_elapsed_time_since_exclusion(f.mz, current_rt)
-                state['excluded'][i] = excluded
+                excluded_t0, excluded_t1 = self._get_elapsed_time_since_exclusion(
+                    f.mz, current_rt)
+                state['excluded_t0'][i] = excluded_t0
+                state['excluded_t1'][i] = excluded_t1
 
             state['ms_level'] = 1
             self.elapsed_scans_since_last_ms1 += 1
@@ -383,21 +389,33 @@ class DDAEnv(gym.Env):
 
     def _get_elapsed_time_since_exclusion(self, mz, current_rt):
         """
-        Get elapsed time since last exclusion
+        Get elapsed time since last exclusion for a precursor ion
         if there are multiple boxes, choose the earliest one
         """
-        excluded = 0.0
+        # initially not excluded
+        excluded_t0 = 0
+        excluded_t1 = 0.0
+        found = False
+
+        # check boxes containing this m/z and RT
         boxes = self.exclusion.exclusion_list.check_point(mz, current_rt)
+
         if len(boxes) == 1:  # most likely case
+            found = True
             last_frag_at = boxes.pop().frag_at
-            excluded = current_rt - last_frag_at
+
         elif len(boxes) > 0:  # almost never happens
+            found = True
             frag_ats = [b.frag_at for b in boxes]
             last_frag_at = min(frag_ats)
-            excluded = current_rt - last_frag_at
 
-        excluded = clip_value(excluded, self.rt_tol)
-        return excluded
+        if found:
+            excluded_t1 = current_rt - last_frag_at
+            excluded_t0 = 1 if excluded_t1 < self.exclusion_t0 else 0
+
+        # Ensure that it's between 0 to 1
+        excluded_t1 = clip_value(excluded_t1, self.exclusion_t1)
+        return excluded_t0, excluded_t1
 
     def _update_counts(self, state):
 
@@ -410,7 +428,7 @@ class DDAEnv(gym.Env):
         # count unfragmented
         unfragmented_count = np.count_nonzero(fragmented[:num_features] == 0)
 
-        excluded = state['excluded']
+        excluded = state['excluded_t0']
 
         # count excluded
         excluded_count = np.count_nonzero(excluded[:num_features] > 0)
@@ -426,6 +444,9 @@ class DDAEnv(gym.Env):
             self.elapsed_scans_since_start, 10000)
         state['elapsed_scans_since_last_ms1'][0] = clip_value(
             self.elapsed_scans_since_last_ms1, 100)
+
+        assert (fragmented_count + unfragmented_count) == num_features
+        assert (excluded_count + unexcluded_count) == num_features
 
     def _initial_values(self):
         """
@@ -459,7 +480,7 @@ class DDAEnv(gym.Env):
         self.roi_builder = RoiBuilder(self.roi_params, smartroi_params=smartroi_params)
 
         # track excluded ions
-        self.exclusion = CleanerTopNExclusion(self.mz_tol, self.rt_tol)
+        self.exclusion = CleanerTopNExclusion(self.mz_tol, self.exclusion_t1)
 
         # track fragmented chemicals
         self.frag_chem_intensity = {}
@@ -531,6 +552,9 @@ class DDAEnv(gym.Env):
                     is_valid = False
                 elif f.original_intensity < self.min_ms1_intensity:
                     # check if targeting a feature below min intensity
+                    is_valid = False
+                elif f.excluded_t0:
+                    # check if this feature is excluded under DEW
                     is_valid = False
                 else:
                     # valid MS2 target
