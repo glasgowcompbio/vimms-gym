@@ -35,6 +35,8 @@ params, max_peaks = preset_func(model_name, alpha=alpha, beta=beta,
 print(params)
 print(max_peaks)
 
+params['env']['use_dew'] = True
+
 env = DDAEnv(max_peaks, params)
 check_env(env)
 

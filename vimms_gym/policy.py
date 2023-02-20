@@ -52,7 +52,7 @@ def topN_policy(obs, features, N, min_ms1_intensity):
 
     # TopN selection: find unfragmented, unexcluded peaks above min_intensity
     filtered = scan_df.query(
-        'fragmented == 0 & excluded_t0 == 0 & above_min_intensity == 1')
+        'fragmented == 0 & excluded == 0 & above_min_intensity == 1')
 
     # nothing to fragment, do an MS1 scan
     if len(filtered) == 0:
@@ -65,7 +65,7 @@ def topN_policy(obs, features, N, min_ms1_intensity):
         # some checks on the selected feature to fragment
         f = features[idx]
         assert f.original_intensity > min_ms1_intensity # check above min intensity
-        assert not f.excluded_t0 # check not currently excluded
+        assert not f.excluded # check not currently excluded
         assert not f.fragmented # check not fragmented before
         return idx
 

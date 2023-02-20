@@ -58,7 +58,6 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                print_eval=False, print_reward=False, mzml_prefix=None,
                intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD, horizon=HISTORY_HORIZON,
                write_mzML=True):
-
     if METHOD_DQN in method:
         assert model is not None
     if METHOD_PPO in method:
@@ -82,25 +81,27 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
         # lists to store episodic results
         episode = Episode(obs)
-        episode_starts = np.ones((1,), dtype=bool)        
+        episode_starts = np.ones((1,), dtype=bool)
         while not done:  # repeat until episode is done
 
-            unwrapped_obs = env.env.env.state # access the state attribute in DDAEnv
+            unwrapped_obs = env.env.env.state  # access the state attribute in DDAEnv
 
             # select an action depending on the observation and method
             action, action_probs, states = pick_action(
-                method, obs, unwrapped_obs, model, env.features, N, min_ms1_intensity, states=states, episode_starts=episode_starts)
+                method, obs, unwrapped_obs, model, env.features, N, min_ms1_intensity,
+                states=states, episode_starts=episode_starts)
 
             # make one step through the simulation
             obs, reward, done, info = env.step(action)
             episode_starts = done
-            
+
             # store new episodic information
             if obs is not None:
                 episode.add_step_data(action, action_probs, obs, reward, info)
 
             if print_reward and episode.num_steps % 500 == 0:
-                print('steps\t', episode.num_steps, '\ttotal rewards\t', episode.get_total_rewards())
+                print('steps\t', episode.num_steps, '\ttotal rewards\t',
+                      episode.get_total_rewards())
 
             # if episode is finished, break
             if done:
@@ -127,8 +128,8 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
     return all_episodic_results
 
 
-def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensity, 
-    states=None, episode_starts=None):
+def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensity,
+                states=None, episode_starts=None):
     action_probs = []
 
     if method != METHOD_PPO_RECURRENT:
@@ -147,12 +148,13 @@ def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensit
         action, states = model.predict(obs, deterministic=True)
         action_probs = get_ppo_action_probs(model, obs)
     elif method == METHOD_PPO_RECURRENT:
-        action, states = model.predict(obs, deterministic=True, state=states, episode_start=episode_starts)
+        action, states = model.predict(obs, deterministic=True, state=states,
+                                       episode_start=episode_starts)
         # FIXME: this is not working yet
         # action_probs = get_recurrent_ppo_action_probs(model, obs, states, episode_starts)        
     elif method == METHOD_DQN:
         action, states = model.predict(obs, deterministic=True)
         q_values = get_dqn_q_values(model, obs)
-        action_probs = q_values # not really ....
+        action_probs = q_values  # not really ....
 
     return action, action_probs, states

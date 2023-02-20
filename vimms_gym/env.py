@@ -35,8 +35,6 @@ class DDAEnv(gym.Env):
         assert len(params) > 0
         self.max_peaks = max_peaks
         self.in_dim = self.max_peaks + 1  # 0 is for MS1
-        self.action_space = self._get_action_space()
-        self.observation_space = self._get_observation_space()
 
         self.chemical_creator_params = params['chemical_creator']
         self.noise_params = params['noise']
@@ -44,9 +42,9 @@ class DDAEnv(gym.Env):
         self.alpha = ALPHA if 'alpha' not in self.env_params else self.env_params['alpha']
         self.beta = BETA if 'beta' not in self.env_params else self.env_params['beta']
 
+        self.use_dew = self.env_params['use_dew']
         self.mz_tol = self.env_params['mz_tol']
-        self.exclusion_t0 = self.env_params['exclusion_t0']
-        self.exclusion_t1 = self.env_params['exclusion_t1']
+        self.rt_tol = self.env_params['rt_tol']
         self.min_ms1_intensity = self.env_params['min_ms1_intensity']
         self.isolation_window = self.env_params['isolation_window']
 
@@ -54,6 +52,9 @@ class DDAEnv(gym.Env):
             self.roi_params = self.env_params['roi_params']
         except KeyError:
             self.roi_params = RoiBuilderParams()
+
+        self.action_space = self._get_action_space()
+        self.observation_space = self._get_observation_space()
 
         self.mass_spec = None
         self.controller = None
@@ -72,12 +73,12 @@ class DDAEnv(gym.Env):
         """
         lo = CLIPPED_INTENSITY_LOW
         hi = CLIPPED_INTENSITY_HIGH
-        combined_spaces = spaces.Dict({
+
+        spaces_dict = {
             # precursor ion features
             'intensities': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
             'fragmented': spaces.MultiBinary(self.max_peaks),
-            'excluded_t0': spaces.MultiBinary(self.max_peaks),
-            'excluded_t1': spaces.Box(low=0, high=1, shape=(self.max_peaks,)),
+            'excluded': spaces.MultiBinary(self.max_peaks),
 
             # roi features
             'roi_length': spaces.Box(
@@ -109,7 +110,14 @@ class DDAEnv(gym.Env):
             'unexcluded_count': spaces.Box(low=0, high=1, shape=(1,)),
             'elapsed_scans_since_start': spaces.Box(low=0, high=1, shape=(1,)),
             'elapsed_scans_since_last_ms1': spaces.Box(low=0, high=1, shape=(1,)),
-        })
+        }
+
+        if not self.use_dew:
+            del spaces_dict['excluded']
+            del spaces_dict['excluded_count']
+            del spaces_dict['unexcluded_count']
+
+        combined_spaces = spaces.Dict(spaces_dict)
         return combined_spaces
 
     def _initial_state(self):
@@ -117,8 +125,7 @@ class DDAEnv(gym.Env):
             # precursor ion features
             'intensities': np.zeros(self.max_peaks, dtype=np.float32),
             'fragmented': np.zeros(self.max_peaks, dtype=np.float32),
-            'excluded_t0': np.zeros(self.max_peaks, dtype=np.float32),
-            'excluded_t1': np.zeros(self.max_peaks, dtype=np.float32),
+            'excluded': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi features
             'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
@@ -146,6 +153,12 @@ class DDAEnv(gym.Env):
             'elapsed_scans_since_start': np.zeros(1, dtype=np.float32),
             'elapsed_scans_since_last_ms1': np.zeros(1, dtype=np.float32)
         }
+
+        if not self.use_dew:
+            del features['excluded']
+            del features['excluded_count']
+            del features['unexcluded_count']
+
         return features
 
     def _get_state(self, scan_to_process, dda_action):
@@ -208,8 +221,10 @@ class DDAEnv(gym.Env):
                 fragmented = False
 
                 # update exclusion elapsed time for all features
-                current_rt = scan_to_process.rt
-                excluded_t0, excluded_t1 = self._get_elapsed_time_since_exclusion(mz, current_rt)
+                excluded = False
+                if self.use_dew:
+                    current_rt = scan_to_process.rt
+                    excluded = self._get_excluded(mz, current_rt)
 
                 try:
                     last_datum = (mz, rt, original_intensity)
@@ -224,7 +239,7 @@ class DDAEnv(gym.Env):
                     #     print('%s: %s' % (roi, roi.get_last_datum()))
 
                 feature = Feature(mz, rt, original_intensity, None,
-                                  fragmented, excluded_t0, excluded_t1, roi)
+                                  fragmented, excluded, roi)
                 features.append(feature)
             self.features = features
 
@@ -237,8 +252,8 @@ class DDAEnv(gym.Env):
                 f = features[i]
                 state['intensities'][i] = f.original_intensity
                 state['fragmented'][i] = 0 if not f.fragmented else 1
-                state['excluded_t0'][i] = 0 if not f.excluded_t0 else 1
-                state['excluded_t1'][i] = f.excluded_t1
+                if self.use_dew:
+                    state['excluded'][i] = 0 if not f.excluded else 1
                 state['valid_actions'][i] = 1  # fragmentable
                 if f.original_intensity < self.min_ms1_intensity:
                     state['valid_actions'][i] = 0  # except when it's below min ms1 intensity
@@ -288,7 +303,8 @@ class DDAEnv(gym.Env):
                 f.fragmented = True
 
                 # update exclusion for the selected feature
-                self.exclusion.update(f.mz, f.rt)
+                if self.use_dew:
+                    self.exclusion.update(f.mz, f.rt)
 
                 # set the ROI linked to this feature to be fragmented
                 if f.roi is not None:  # FIXME: it shouldn't happen?
@@ -298,14 +314,12 @@ class DDAEnv(gym.Env):
                 pass
 
             # update exclusion elapsed time for all features
-            for i in range(len(self.features)):
-                f = self.features[i]
-                excluded_t0, excluded_t1 = self._get_elapsed_time_since_exclusion(
-                    f.mz, current_rt)
-                state['excluded_t0'][i] = excluded_t0
-                state['excluded_t1'][i] = excluded_t1
-                f.excluded_t0 = excluded_t0
-                f.excluded_t1 = excluded_t1
+            if self.use_dew:
+                for i in range(len(self.features)):
+                    f = self.features[i]
+                    excluded = self._get_excluded(f.mz, current_rt)
+                    state['excluded'][i] = excluded
+                    f.excluded = excluded
 
             state['ms_level'] = 1
             self.elapsed_scans_since_last_ms1 += 1
@@ -389,35 +403,9 @@ class DDAEnv(gym.Env):
         state['roi_intensities_4'][i] = roi_intensities_4
         state['roi_intensities_5'][i] = roi_intensities_5
 
-    def _get_elapsed_time_since_exclusion(self, mz, current_rt):
-        """
-        Get elapsed time since last exclusion for a precursor ion
-        if there are multiple boxes, choose the earliest one
-        """
-        # initially not excluded
-        excluded_t0 = False
-        excluded_t1 = 0.0
-        found = False
-
-        # check boxes containing this m/z and RT
-        boxes = self.exclusion.exclusion_list.check_point(mz, current_rt)
-
-        if len(boxes) == 1:  # most likely case
-            found = True
-            last_frag_at = boxes.pop().frag_at
-
-        elif len(boxes) > 0:  # almost never happens
-            found = True
-            frag_ats = [b.frag_at for b in boxes]
-            last_frag_at = min(frag_ats)
-
-        if found:
-            excluded_t1 = current_rt - last_frag_at
-            excluded_t0 = True if excluded_t1 < self.exclusion_t0 else False
-
-        # Ensure that it's between 0 to 1
-        excluded_t1 = clip_value(excluded_t1, self.exclusion_t1)
-        return excluded_t0, excluded_t1
+    def _get_excluded(self, mz, current_rt):
+        # check if any boxes containing this m/z and RT
+        return self.exclusion.exclusion_list.is_in_box(mz, current_rt)
 
     def _update_counts(self, state):
 
@@ -430,25 +418,25 @@ class DDAEnv(gym.Env):
         # count unfragmented
         unfragmented_count = np.count_nonzero(fragmented[:num_features] == 0)
 
-        excluded = state['excluded_t0']
-
-        # count excluded
-        excluded_count = np.count_nonzero(excluded[:num_features] > 0)
-
-        # count non-excluded
-        unexcluded_count = np.count_nonzero(excluded[:num_features] == 0)
-
         state['fragmented_count'][0] = clip_value(fragmented_count, num_features)
         state['unfragmented_count'][0] = clip_value(unfragmented_count, num_features)
-        state['excluded_count'][0] = clip_value(excluded_count, num_features)
-        state['unexcluded_count'][0] = clip_value(unexcluded_count, num_features)
+        assert (fragmented_count + unfragmented_count) == num_features
+
         state['elapsed_scans_since_start'][0] = clip_value(
             self.elapsed_scans_since_start, 10000)
         state['elapsed_scans_since_last_ms1'][0] = clip_value(
             self.elapsed_scans_since_last_ms1, 100)
 
-        assert (fragmented_count + unfragmented_count) == num_features
-        assert (excluded_count + unexcluded_count) == num_features
+        if self.use_dew:
+
+            # count excluded and not-excluded
+            excluded = state['excluded']
+            excluded_count = np.count_nonzero(excluded[:num_features] > 0)
+            unexcluded_count = np.count_nonzero(excluded[:num_features] == 0)
+
+            state['excluded_count'][0] = clip_value(excluded_count, num_features)
+            state['unexcluded_count'][0] = clip_value(unexcluded_count, num_features)
+            assert (excluded_count + unexcluded_count) == num_features
 
     def _initial_values(self):
         """
@@ -483,7 +471,8 @@ class DDAEnv(gym.Env):
         self.roi_builder = RoiBuilder(self.roi_params, smartroi_params=smartroi_params)
 
         # track excluded ions
-        self.exclusion = CleanerTopNExclusion(self.mz_tol, self.exclusion_t1)
+        if self.use_dew:
+            self.exclusion = CleanerTopNExclusion(self.mz_tol, self.rt_tol)
 
         # track fragmented chemicals
         self.frag_chem_intensity = {}
