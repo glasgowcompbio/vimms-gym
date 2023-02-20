@@ -556,9 +556,6 @@ class DDAEnv(gym.Env):
                 elif f.original_intensity < self.min_ms1_intensity:
                     # check if targeting a feature below min intensity
                     is_valid = False
-                elif f.excluded_t0:
-                    # check if this feature is excluded under DEW
-                    is_valid = False
                 else:
                     # valid MS2 target
                     target_mz = f.mz
