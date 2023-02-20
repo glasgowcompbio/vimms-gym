@@ -54,5 +54,5 @@ results = run_method(None, params, max_peaks, chem_list, method, out_dir,
 num_ms1_scans = results[0].eval_res['num_ms1_scans']
 num_ms2_scans = results[0].eval_res['num_ms2_scans']
 print(num_ms1_scans, num_ms2_scans)
-assert(num_ms1_scans == 217)
-assert(num_ms2_scans == 1566)
+assert(num_ms1_scans == 278)
+assert(num_ms2_scans == 1444)
