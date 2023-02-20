@@ -237,7 +237,7 @@ class DDAEnv(gym.Env):
                 f = features[i]
                 state['intensities'][i] = f.original_intensity
                 state['fragmented'][i] = 0 if not f.fragmented else 1
-                state['excluded_t0'][i] = f.excluded_t0
+                state['excluded_t0'][i] = 0 if not f.excluded_t0 else 1
                 state['excluded_t1'][i] = f.excluded_t1
                 state['valid_actions'][i] = 1  # fragmentable
                 if f.original_intensity < self.min_ms1_intensity:
@@ -304,6 +304,8 @@ class DDAEnv(gym.Env):
                     f.mz, current_rt)
                 state['excluded_t0'][i] = excluded_t0
                 state['excluded_t1'][i] = excluded_t1
+                f.excluded_t0 = excluded_t0
+                f.excluded_t1 = excluded_t1
 
             state['ms_level'] = 1
             self.elapsed_scans_since_last_ms1 += 1
@@ -393,7 +395,7 @@ class DDAEnv(gym.Env):
         if there are multiple boxes, choose the earliest one
         """
         # initially not excluded
-        excluded_t0 = 0
+        excluded_t0 = False
         excluded_t1 = 0.0
         found = False
 
@@ -411,7 +413,7 @@ class DDAEnv(gym.Env):
 
         if found:
             excluded_t1 = current_rt - last_frag_at
-            excluded_t0 = 1 if excluded_t1 < self.exclusion_t0 else 0
+            excluded_t0 = True if excluded_t1 < self.exclusion_t0 else False
 
         # Ensure that it's between 0 to 1
         excluded_t1 = clip_value(excluded_t1, self.exclusion_t1)

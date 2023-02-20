@@ -61,6 +61,12 @@ def topN_policy(obs, features, N, min_ms1_intensity):
     # select the most intense peak to fragment
     else:
         idx = filtered['intensities'].idxmax()
+
+        # some checks on the selected feature to fragment
+        f = features[idx]
+        assert f.original_intensity > min_ms1_intensity # check above min intensity
+        assert not f.excluded_t0 # check not currently excluded
+        assert not f.fragmented # check not fragmented before
         return idx
 
 
