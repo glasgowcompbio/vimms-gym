@@ -6,7 +6,7 @@ timesteps=1E6
 repeat=1
 verbose=2
 preset="QCB_resimulated_medium"
-alphas=( 0.50 )
+alphas=( 0.25 )
 betas=( 0.50 )
 horizons=( 4 )
 

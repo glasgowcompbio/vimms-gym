@@ -46,22 +46,22 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
     if model_name == METHOD_DQN:
 
-        # best F-1 score result with 5E5 timesteps
-        # alpha   = 0.489231295
-        # beta    = 0.07277375
+        # highest reward for 1E6 timesteps
+        # alpha   = 0.25
+        # beta    = 0.50
         # horizon = 4
         gamma = 0.9
-        learning_rate = 0.000238173
-        batch_size = 128
-        buffer_size = 100000
-        train_freq = 1
-        subsample_steps = 4
+        learning_rate = 0.000480804
+        batch_size = 64
+        buffer_size = 50000
+        train_freq = 4
+        subsample_steps = 1
         gradient_steps = max(train_freq // subsample_steps, 1)
-        exploration_fraction = 0.291786842
-        exploration_final_eps = 0.109176895
-        target_update_interval = 20000
-        learning_starts = 20000
-        hidden_nodes = 512
+        exploration_fraction = 0.376049119
+        exploration_final_eps = 0.113581093
+        target_update_interval = 5000
+        learning_starts = 1000
+        hidden_nodes = 256
 
         policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {
@@ -78,6 +78,7 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
             'policy_kwargs': policy_kwargs
         }
     elif model_name == METHOD_PPO:
+        # FIXME: not sure where this came from, need to optimise
         hidden_nodes = 512
         net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
         params['model'] = {
