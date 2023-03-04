@@ -46,22 +46,22 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
     if model_name == METHOD_DQN:
 
-        # highest reward for 1E6 timesteps
+        # most stable reward for 1E6 timesteps
         # alpha   = 0.25
         # beta    = 0.50
         # horizon = 4
         gamma = 0.9
-        learning_rate = 0.000480804
-        batch_size = 64
-        buffer_size = 50000
-        train_freq = 4
+        learning_rate = 0.000232586
+        batch_size = 128
+        buffer_size = 100000
+        train_freq = 128
         subsample_steps = 1
         gradient_steps = max(train_freq // subsample_steps, 1)
-        exploration_fraction = 0.376049119
-        exploration_final_eps = 0.113581093
+        exploration_fraction = 0.450071463
+        exploration_final_eps = 0.060611843
         target_update_interval = 5000
         learning_starts = 1000
-        hidden_nodes = 256
+        hidden_nodes = 64
 
         policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {
