@@ -16,11 +16,10 @@ from vimms.Roi import RoiBuilder, SmartRoiParams, RoiBuilderParams
 
 from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
-from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, \
-    MAX_ROI_LENGTH_SECONDS, RENDER_HUMAN, \
-    RENDER_RGB_ARRAY, render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, \
-    CLIPPED_INTENSITY_LOW, \
+from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, RENDER_HUMAN, RENDER_RGB_ARRAY, \
+    render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, CLIPPED_INTENSITY_LOW, \
     CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE
+from vimms_gym.env_utils import scale_intensities, update_feature_roi
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -169,239 +168,146 @@ class DDAEnv(gym.Env):
         self._update_counts(state)
         return state
 
-    def _scale_intensities(self, intensity_values, num_features):
-
-        if np.all(intensity_values == 0):
-            # If all the input values are zero, return it
-            return intensity_values
-
-        # operate only on the slice actually containing peak data
-        arr = intensity_values[:num_features]
-
-        # Identify non-zero values using a boolean mask
-        # Apply log transform only to non-zero values
-        nonzero_mask = arr != 0
-        log_intensity_values = np.zeros_like(arr)
-        log_intensity_values[nonzero_mask] = np.log(arr[nonzero_mask])
-
-        # Scale the log-transformed intensity values to be between 0 and 1
-        scaled_intensity_values = log_intensity_values / MAX_OBSERVED_LOG_INTENSITY
-        scaled_intensity_values = np.clip(scaled_intensity_values, 0, 1)
-
-        # set the calculation back to intensity_values
-        intensity_values[:num_features] = scaled_intensity_values
-        return intensity_values
-
     def _scan_to_state(self, dda_action, scan_to_process):
         # TODO: can be moved into its own class?
 
         self.elapsed_scans_since_start += 1
         if dda_action.ms_level == 1:
-
-            # store last action
-            self.last_action = self.in_dim
-
-            # new ms1 scan, so initialise a new state
-            mzs, rt, intensities = self._get_mzs_rt_intensities(scan_to_process)
-            self.roi_builder.update_roi(scan_to_process)
-            live_rois = self.roi_builder.live_roi
-
-            # used to quickly match feature to a live ROI
-            # key: last (mz, rt, intensity) of an ROI, value: the ROI object
-            last_datum_to_roi = {roi.get_last_datum(): roi for roi in live_rois}
-
-            # get the N most intense features first
-            features = []
-            sorted_indices = np.flip(intensities.argsort())
-            for i in sorted_indices[0:self.max_peaks]:
-                mz = mzs[i]
-                original_intensity = intensities[i]
-
-                # initially nothing has been fragmented
-                fragmented = False
-
-                # update exclusion elapsed time for all features
-                excluded = False
-                if self.use_dew:
-                    current_rt = scan_to_process.rt
-                    excluded = self._get_excluded(mz, current_rt)
-
-                try:
-                    last_datum = (mz, rt, original_intensity)
-                    roi = last_datum_to_roi[last_datum]
-                except KeyError:
-                    # This happens only for noise peaks, which as no associated chemical
-                    # TODO: I think we should handle this better?
-                    roi = None
-
-                    # print('Missing: %f %f %f' % last_datum)
-                    # for roi in self.roi_builder.live_roi:
-                    #     print('%s: %s' % (roi, roi.get_last_datum()))
-
-                feature = Feature(mz, rt, original_intensity, None,
-                                  fragmented, excluded, roi)
-                features.append(feature)
-            self.features = features
-
-            # convert features to state
-            num_features = len(features)
-            assert num_features <= self.max_peaks
-            state = self._initial_state()
-
-            for i in range(num_features):
-                f = features[i]
-                state['intensities'][i] = f.original_intensity
-                state['fragmented'][i] = 0 if not f.fragmented else 1
-                if self.use_dew:
-                    state['excluded'][i] = 0 if not f.excluded else 1
-                state['valid_actions'][i] = 1  # fragmentable
-                if f.original_intensity < self.min_ms1_intensity:
-                    state['valid_actions'][i] = 0  # except when it's below min ms1 intensity
-                self._update_roi(f, i, state)  # update ROI information for this feature
-
-            state['intensities'] = self._scale_intensities(
-                state['intensities'], num_features)
-            state['roi_intensity_at_last_frag'] = self._scale_intensities(
-                state['roi_intensity_at_last_frag'], num_features)
-            state['roi_min_intensity_since_last_frag'] = self._scale_intensities(
-                state['roi_min_intensity_since_last_frag'], num_features)
-            state['roi_max_intensity_since_last_frag'] = self._scale_intensities(
-                state['roi_max_intensity_since_last_frag'], num_features)
-
-            state['roi_intensities_2'] = self._scale_intensities(
-                state['roi_intensities_2'], num_features)
-            state['roi_intensities_3'] = self._scale_intensities(
-                state['roi_intensities_3'], num_features)
-            state['roi_intensities_4'] = self._scale_intensities(
-                state['roi_intensities_4'], num_features)
-            state['roi_intensities_5'] = self._scale_intensities(
-                state['roi_intensities_5'], num_features)
-
-            state['ms_level'] = 0
-            self.elapsed_scans_since_last_ms1 = 0
+            state = self._scan_to_state_ms1(scan_to_process)
 
         elif dda_action.ms_level == 2:
-
-            # same ms1 scan, update state
-            state = deepcopy(self.state)
-            idx = dda_action.idx
-            assert idx is not None
-
-            # store last action
-            self.last_action = idx
-
-            # update fragmented flag
-            state['fragmented'][idx] = 1
-
-            # it's no longer valid to fragment this peak again
-            state['valid_actions'][idx] = 0
-
-            # find the feature that has been fragmented in this MS2 scan
-            current_rt = scan_to_process.rt
-            try:
-                f = self.features[idx]
-                f.fragmented = True
-
-                # update exclusion for the selected feature
-                if self.use_dew:
-                    self.exclusion.update(f.mz, f.rt)
-
-                # set the ROI linked to this feature to be fragmented
-                if f.roi is not None:  # FIXME: it shouldn't happen?
-                    f.roi.fragmented()
-
-            except IndexError:  # idx selects a non-existing feature
-                pass
-
-            # update exclusion elapsed time for all features
-            if self.use_dew:
-                for i in range(len(self.features)):
-                    f = self.features[i]
-                    excluded = self._get_excluded(f.mz, current_rt)
-                    state['excluded'][i] = excluded
-                    f.excluded = excluded
-
-            state['ms_level'] = 1
-            self.elapsed_scans_since_last_ms1 += 1
+            state = self._scan_to_state_ms2(dda_action, scan_to_process)
 
         state['valid_actions'][-1] = 1  # ms1 action is always valid
         state['last_action'] = self.last_action
         return state
 
-    def _update_roi(self, feature, i, state):
-        # for each feature, get its associated live ROI
-        # there should always be a live ROI for each feature
-        roi = feature.roi
+    def _scan_to_state_ms1(self, scan_to_process):
 
-        # current length of this ROI (in seconds)
-        try:
-            roi_length = clip_value(roi.length_in_seconds, MAX_ROI_LENGTH_SECONDS)
-        except AttributeError:  # no ROI object
-            roi_length = 0.0
+        # store last action
+        self.last_action = self.in_dim
 
-        try:
-            # time elapsed (in seconds) since last fragmentation of this ROI
-            val = roi.rt_list[-1] - roi.rt_list[roi.fragmented_index]
-            roi_elapsed_time_since_last_frag = clip_value(np.log(val), MAX_ROI_LENGTH_SECONDS)
-        except AttributeError:  # no ROI object, or never been fragmented
-            roi_elapsed_time_since_last_frag = 0.0
+        # new ms1 scan, so initialise a new state
+        mzs, rt, intensities = self._get_mzs_rt_intensities(scan_to_process)
+        self.roi_builder.update_roi(scan_to_process)
+        live_rois = self.roi_builder.live_roi
 
-        try:
-            # intensity of this ROI at last fragmentation
-            roi_intensity_at_last_frag = roi.intensity_list[roi.fragmented_index]
-        except AttributeError:  # no ROI object, or never been fragmented
-            roi_intensity_at_last_frag = 0.0
+        # used to quickly match feature to a live ROI
+        # key: last (mz, rt, intensity) of an ROI, value: the ROI object
+        last_datum_to_roi = {roi.get_last_datum(): roi for roi in live_rois}
 
-        try:
-            # minimum intensity of this ROI since last fragmentation
-            roi_min_intensity_since_last_frag = min(roi.intensity_list[roi.fragmented_index:])
-        except AttributeError:  # no ROI object, or never been fragmented
-            roi_min_intensity_since_last_frag = 0.0
+        # get the N most intense features first
+        features = []
+        sorted_indices = np.flip(intensities.argsort())
+        for i in sorted_indices[0:self.max_peaks]:
+            mz = mzs[i]
+            original_intensity = intensities[i]
 
-        try:
-            # maximum intensity of this ROI since last fragmentation
-            roi_max_intensity_since_last_frag = max(roi.intensity_list[roi.fragmented_index:])
-        except AttributeError:  # no ROI object, or never been fragmented
-            roi_max_intensity_since_last_frag = 0.0
+            # initially nothing has been fragmented
+            fragmented = False
 
-        # last few intensity values of this ROI
-        roi_intensities_2 = 0.0
-        roi_intensities_3 = 0.0
-        roi_intensities_4 = 0.0
-        roi_intensities_5 = 0.0
-
-        if roi is not None:
-            intensities = roi.intensity_list
-            try:
-                roi_intensities_2 = intensities[-2]
-            except IndexError:
-                pass
+            # update exclusion elapsed time for all features
+            excluded = False
+            if self.use_dew:
+                current_rt = scan_to_process.rt
+                excluded = self._get_excluded(mz, current_rt)
 
             try:
-                roi_intensities_3 = intensities[-3]
-            except IndexError:
-                pass
+                last_datum = (mz, rt, original_intensity)
+                roi = last_datum_to_roi[last_datum]
+            except KeyError:
+                # This happens only for noise peaks, which as no associated chemical
+                # TODO: I think we should handle this better?
+                roi = None
 
-            try:
-                roi_intensities_4 = intensities[-4]
-            except IndexError:
-                pass
+                # print('Missing: %f %f %f' % last_datum)
+                # for roi in self.roi_builder.live_roi:
+                #     print('%s: %s' % (roi, roi.get_last_datum()))
 
-            try:
-                roi_intensities_5 = intensities[-5]
-            except IndexError:
-                pass
+            feature = Feature(mz, rt, original_intensity, None,
+                              fragmented, excluded, roi)
+            features.append(feature)
+        self.features = features
 
-        state['roi_length'][i] = roi_length
-        state['roi_elapsed_time_since_last_frag'][i] = roi_elapsed_time_since_last_frag
-        state['roi_intensity_at_last_frag'][i] = roi_intensity_at_last_frag
-        state['roi_min_intensity_since_last_frag'][i] = roi_min_intensity_since_last_frag
-        state['roi_max_intensity_since_last_frag'][i] = roi_max_intensity_since_last_frag
+        # convert features to state
+        num_features = len(features)
+        assert num_features <= self.max_peaks
+        state = self._initial_state()
+        for i in range(num_features):
+            f = features[i]
+            state['intensities'][i] = f.original_intensity
+            state['fragmented'][i] = 0 if not f.fragmented else 1
+            if self.use_dew:
+                state['excluded'][i] = 0 if not f.excluded else 1
+            state['valid_actions'][i] = 1  # fragmentable
+            if f.original_intensity < self.min_ms1_intensity:
+                state['valid_actions'][i] = 0  # except when it's below min ms1 intensity
+            update_feature_roi(f, i, state)  # update ROI information for this feature
 
-        state['roi_intensities_2'][i] = roi_intensities_2
-        state['roi_intensities_3'][i] = roi_intensities_3
-        state['roi_intensities_4'][i] = roi_intensities_4
-        state['roi_intensities_5'][i] = roi_intensities_5
+        state['intensities'] = scale_intensities(
+            state['intensities'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensity_at_last_frag'] = scale_intensities(
+            state['roi_intensity_at_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_min_intensity_since_last_frag'] = scale_intensities(
+            state['roi_min_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_max_intensity_since_last_frag'] = scale_intensities(
+            state['roi_max_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensities_2'] = scale_intensities(
+            state['roi_intensities_2'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensities_3'] = scale_intensities(
+            state['roi_intensities_3'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensities_4'] = scale_intensities(
+            state['roi_intensities_4'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensities_5'] = scale_intensities(
+            state['roi_intensities_5'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+
+        state['ms_level'] = 0
+        self.elapsed_scans_since_last_ms1 = 0
+        return state
+
+    def _scan_to_state_ms2(self, dda_action, scan_to_process):
+
+        # same ms1 scan, update state
+        state = deepcopy(self.state)
+        idx = dda_action.idx
+        assert idx is not None
+
+        # store last action
+        self.last_action = idx
+
+        # update fragmented flag
+        state['fragmented'][idx] = 1
+
+        # it's no longer valid to fragment this peak again
+        state['valid_actions'][idx] = 0
+
+        # find the feature that has been fragmented in this MS2 scan
+        current_rt = scan_to_process.rt
+        try:
+            f = self.features[idx]
+            f.fragmented = True
+
+            # update exclusion for the selected feature
+            if self.use_dew:
+                self.exclusion.update(f.mz, f.rt)
+
+            # set the ROI linked to this feature to be fragmented
+            if f.roi is not None:  # FIXME: it shouldn't happen?
+                f.roi.fragmented()
+
+        except IndexError:  # idx selects a non-existing feature
+            pass
+
+        # update exclusion elapsed time for all features
+        if self.use_dew:
+            for i in range(len(self.features)):
+                f = self.features[i]
+                excluded = self._get_excluded(f.mz, current_rt)
+                state['excluded'][i] = excluded
+                f.excluded = excluded
+        state['ms_level'] = 1
+        self.elapsed_scans_since_last_ms1 += 1
+        return state
 
     def _get_excluded(self, mz, current_rt):
         # check if any boxes containing this m/z and RT
