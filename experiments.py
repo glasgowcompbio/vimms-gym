@@ -46,6 +46,8 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
     if model_name == METHOD_DQN:
 
+        # FIXME: this is WRONG. This is for preset_qcb_medium
+        # And anyway we should delete this preset as it's too easy
         # most stable reward for 1E6 timesteps
         # alpha   = 0.25
         # beta    = 0.50
@@ -111,22 +113,22 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
 
     if model_name == METHOD_DQN:
 
-        # 3rd best F-1 score result with 1E6 timesteps
-        # alpha   = 0.005046535
-        # beta    = 0.649154698
+        # best reward with 1E6 timesteps
+        # alpha   = 0.25
+        # beta    = 0.50
         # horizon = 4
-        gamma = 0.98
-        learning_rate = 4.66E-05
-        batch_size = 128
-        buffer_size = 50000
+        gamma = 0.95
+        learning_rate = 0.00014450137513290646
+        batch_size = 256
+        buffer_size = 10000
         train_freq = 1
         subsample_steps = 2
         gradient_steps = max(train_freq // subsample_steps, 1)
-        exploration_fraction = 0.325427907
-        exploration_final_eps = 0.130140357
-        target_update_interval = 10000
-        learning_starts = 5000
-        hidden_nodes = 64
+        exploration_fraction = 0.27797033409246663
+        exploration_final_eps = 0.005589071654866951
+        target_update_interval = 20000
+        learning_starts = 2000
+        hidden_nodes = 256
         policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {
             'gamma': gamma,
@@ -141,7 +143,9 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
             'learning_starts': learning_starts,
             'policy_kwargs': policy_kwargs
         }
+        
     elif model_name == METHOD_PPO:
+        # FIXME: need to optimise
         hidden_nodes = 512
         net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
         params['model'] = {
