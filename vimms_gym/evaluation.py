@@ -129,7 +129,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
 
 def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensity,
-                states=None, episode_starts=None):
+                states=None, episode_starts=None, get_action_probs=False):
     action_probs = []
 
     if method != METHOD_PPO_RECURRENT:
@@ -146,7 +146,9 @@ def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensit
         action = topN_policy(unwrapped_obs, features, N, min_ms1_intensity)
     elif method == METHOD_PPO:
         action, states = model.predict(obs, deterministic=True)
-        action_probs = get_ppo_action_probs(model, obs)
+        action_probs = None
+        if get_action_probs:
+            action_probs = get_ppo_action_probs(model, obs)
     elif method == METHOD_PPO_RECURRENT:
         action, states = model.predict(obs, deterministic=True, state=states,
                                        episode_start=episode_starts)
@@ -154,7 +156,9 @@ def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensit
         # action_probs = get_recurrent_ppo_action_probs(model, obs, states, episode_starts)        
     elif method == METHOD_DQN:
         action, states = model.predict(obs, deterministic=True)
-        q_values = get_dqn_q_values(model, obs)
-        action_probs = q_values  # not really ....
+        action_probs = None
+        if get_action_probs:
+            q_values = get_dqn_q_values(model, obs)
+            action_probs = q_values  # not really ....
 
     return action, action_probs, states
