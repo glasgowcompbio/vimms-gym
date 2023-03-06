@@ -5,10 +5,10 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_checker import check_env
 from vimms.Common import load_obj
 
-from experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, \
+from vimms_gym.experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, \
     ENV_QCB_LARGE_GAUSSIAN, ENV_QCB_SMALL_EXTRACTED, ENV_QCB_MEDIUM_EXTRACTED, \
     ENV_QCB_LARGE_EXTRACTED, preset_qcb_medium, preset_qcb_large
-from vimms_gym.common import METHOD_TOPN, EVAL_F1_INTENSITY_THRESHOLD, METHOD_DQN
+from vimms_gym.common import EVAL_F1_INTENSITY_THRESHOLD, METHOD_DQN
 from vimms_gym.env import DDAEnv
 from vimms_gym.evaluation import run_method
 

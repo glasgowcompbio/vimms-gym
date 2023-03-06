@@ -1,8 +1,7 @@
 import argparse
 import os
-import sys
-import uuid
 import socket
+import sys
 from pprint import pprint
 
 from loguru import logger
@@ -14,7 +13,6 @@ from vimms_gym.wrappers import HistoryWrapper, flatten_dict_observations
 sys.path.append('.')
 
 import optuna
-from optuna.samplers import TPESampler
 
 # the import order is important to use all cpu cores
 # import numpy as np
@@ -29,7 +27,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CheckpointCallback
 
 from tune import sample_dqn_params, sample_ppo_params, TrialEvalCallback
-from experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, \
+from vimms_gym.experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, \
     ENV_QCB_LARGE_GAUSSIAN, ENV_QCB_SMALL_EXTRACTED, ENV_QCB_MEDIUM_EXTRACTED, \
     ENV_QCB_LARGE_EXTRACTED, preset_qcb_medium, preset_qcb_large
 

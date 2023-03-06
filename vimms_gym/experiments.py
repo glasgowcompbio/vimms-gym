@@ -3,12 +3,12 @@ from os.path import exists
 
 import numpy as np
 from loguru import logger
+
 from vimms.ChemicalSamplers import MZMLFormulaSampler, MZMLRTandIntensitySampler, \
     GaussianChromatogramSampler, MZMLChromatogramSampler
 from vimms.Common import POSITIVE, load_obj, save_obj
 from vimms.Roi import RoiBuilderParams
-
-from vimms_gym.common import linear_schedule, METHOD_DQN, METHOD_PPO, ALPHA, BETA
+from vimms_gym.common import METHOD_DQN, METHOD_PPO, ALPHA, BETA
 
 ENV_QCB_SMALL_GAUSSIAN = 'QCB_chems_small'
 ENV_QCB_MEDIUM_GAUSSIAN = 'QCB_chems_medium'
@@ -20,11 +20,11 @@ ENV_QCB_LARGE_EXTRACTED = 'QCB_resimulated_large'
 
 
 def get_qcb_filename():
-    base_dir = '../..'
-    mzml_filename = os.path.abspath(os.path.join(base_dir, 'notebooks', 'fullscan_QCB.mzML'))
+    base_dir = '../../..'
+    mzml_filename = os.path.abspath(os.path.join(base_dir, '../notebooks', 'fullscan_QCB.mzML'))
     if not exists(mzml_filename):  # try another location
-        base_dir = '.'
-        mzml_filename = os.path.abspath(os.path.join(base_dir, 'notebooks', 'fullscan_QCB.mzML'))
+        base_dir = '..'
+        mzml_filename = os.path.abspath(os.path.join(base_dir, '../notebooks', 'fullscan_QCB.mzML'))
 
     assert exists(mzml_filename)
     return base_dir, mzml_filename
@@ -237,8 +237,8 @@ def generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals, mz_range
 
     base_dir, mzml_filename = get_qcb_filename()
     samplers_pickle = os.path.abspath(os.path.join(base_dir,
-                                                   'pickles', '%s_%s.p' % (samplers_pickle_prefix,
-                                                                           samplers_pickle_suffix)))
+                                                   '../pickles', '%s_%s.p' % (samplers_pickle_prefix,
+                                                                              samplers_pickle_suffix)))
 
     min_mz = mz_range[0]
     max_mz = mz_range[1]

@@ -1,6 +1,6 @@
 import os, sys
 
-from vimms_gym.wrappers import HistoryWrapper, HistoryWrapperObsDict, flatten_dict_observations
+from vimms_gym.wrappers import HistoryWrapper, flatten_dict_observations
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -20,7 +20,7 @@ from vimms_gym.env import DDAEnv
 from vimms_gym.common import EVAL_METRIC_REWARD, HISTORY_HORIZON, evaluate
 
 from tune import TrialEvalCallback
-from experiments import preset_qcb_small
+from vimms_gym.experiments import preset_qcb_small
 
 def debug_run(fname, max_peaks, params, n_eval_episodes=1, deterministic=True):
 

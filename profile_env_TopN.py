@@ -3,7 +3,7 @@ import os
 from stable_baselines3.common.env_checker import check_env
 from vimms.Common import load_obj
 
-from experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, \
+from vimms_gym.experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, \
     ENV_QCB_LARGE_GAUSSIAN, ENV_QCB_SMALL_EXTRACTED, ENV_QCB_MEDIUM_EXTRACTED, \
     ENV_QCB_LARGE_EXTRACTED, preset_qcb_medium, preset_qcb_large
 from vimms_gym.common import METHOD_TOPN, EVAL_F1_INTENSITY_THRESHOLD
