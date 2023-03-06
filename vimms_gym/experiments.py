@@ -20,13 +20,9 @@ ENV_QCB_LARGE_EXTRACTED = 'QCB_resimulated_large'
 
 
 def get_qcb_filename():
-    base_dir = '../../..'
-    mzml_filename = os.path.abspath(os.path.join(base_dir, '../notebooks', 'fullscan_QCB.mzML'))
-    if not exists(mzml_filename):  # try another location
-        base_dir = '..'
-        mzml_filename = os.path.abspath(os.path.join(base_dir, '../notebooks', 'fullscan_QCB.mzML'))
-
-    assert exists(mzml_filename)
+    base_dir = '.'
+    mzml_filename = os.path.abspath(os.path.join(base_dir, 'notebooks', 'fullscan_QCB.mzML'))
+    assert exists(mzml_filename), '%s is missing' % mzml_filename
     return base_dir, mzml_filename
 
 
