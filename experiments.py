@@ -178,16 +178,39 @@ def preset_qcb_large(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
     params['env']['beta'] = beta
 
     if model_name == METHOD_DQN:
-        hidden_nodes = 512
+
+        # same as preset_qcb_medium()
+        # alpha   = 0.25
+        # beta    = 0.50
+        # horizon = 4
+        gamma = 0.95
+        learning_rate = 0.00014450137513290646
+        batch_size = 256
+        buffer_size = 10000
+        train_freq = 1
+        subsample_steps = 2
+        gradient_steps = max(train_freq // subsample_steps, 1)
+        exploration_fraction = 0.27797033409246663
+        exploration_final_eps = 0.005589071654866951
+        target_update_interval = 20000
+        learning_starts = 2000
+        hidden_nodes = 256
+        policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {
-            'gamma': 0.90,
-            'learning_rate': linear_schedule(0.0003, min_value=0.0001),
-            'batch_size': 512,
-            'exploration_fraction': 0.25,
-            'exploration_final_eps': 0.10,
-            'policy_kwargs': dict(net_arch=[hidden_nodes, hidden_nodes]),
+            'gamma': gamma,
+            'learning_rate': learning_rate,
+            'batch_size': batch_size,
+            'buffer_size': buffer_size,
+            'train_freq': train_freq,
+            'gradient_steps': gradient_steps,
+            'exploration_fraction': exploration_fraction,
+            'exploration_final_eps': exploration_final_eps,
+            'target_update_interval': target_update_interval,
+            'learning_starts': learning_starts,
+            'policy_kwargs': policy_kwargs
         }
     elif model_name == METHOD_PPO:
+        # FIXME: need to optimise
         hidden_nodes = 512
         net_arch = [dict(pi=[hidden_nodes, hidden_nodes], vf=[hidden_nodes, hidden_nodes])]
         params['model'] = {
