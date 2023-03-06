@@ -27,12 +27,12 @@ def get_qcb_filename():
         mzml_filename = os.path.abspath(os.path.join(base_dir, 'notebooks', 'fullscan_QCB.mzML'))
 
     assert exists(mzml_filename)
-    return mzml_filename
+    return base_dir, mzml_filename
 
 
 def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
     max_peaks = 100
-    mzml_filename = get_qcb_filename()
+    base_dir, mzml_filename = get_qcb_filename()
     samplers_pickle_prefix = 'samplers_QCB_small'
     n_chemicals = (20, 50)
     mz_range = (100, 110)
@@ -99,7 +99,7 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
 def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
     max_peaks = 200
-    mzml_filename = get_qcb_filename()
+    base_dir, mzml_filename = get_qcb_filename()
     samplers_pickle_prefix = 'samplers_QCB_medium'
     n_chemicals = (200, 500)
     mz_range = (100, 600)
@@ -164,7 +164,7 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
 
 def preset_qcb_large(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
     max_peaks = 200
-    mzml_filename = get_qcb_filename()
+    base_dir, mzml_filename = get_qcb_filename()
     samplers_pickle_prefix = 'samplers_QCB_large'
     n_chemicals = (2000, 5000)
     mz_range = (70, 1000)
@@ -235,11 +235,7 @@ def generate_params(mzml_filename, samplers_pickle_prefix, n_chemicals, mz_range
                     min_roi_length=3, at_least_one_point_above=5E5):
     samplers_pickle_suffix = 'extracted' if extract_chromatograms else 'gaussian'
 
-    base_dir = '../..'
-    mzml_filename = os.path.abspath(os.path.join(base_dir, 'notebooks', 'fullscan_QCB.mzML'))
-    if not exists(mzml_filename): # try another location
-        base_dir = '.'
-
+    base_dir, mzml_filename = get_qcb_filename()
     samplers_pickle = os.path.abspath(os.path.join(base_dir,
                                                    'pickles', '%s_%s.p' % (samplers_pickle_prefix,
                                                                            samplers_pickle_suffix)))
