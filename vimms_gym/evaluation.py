@@ -20,7 +20,6 @@ class Episode():
         self.action_probs = []
         self.infos = []
         self.num_steps = 0
-        self.scans = None
 
     def add_step_data(self, action, action_probs, obs, reward, info):
         self.actions.append(action)
@@ -57,7 +56,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                N=10, min_ms1_intensity=5000, model=None,
                print_eval=False, print_reward=False, mzml_prefix=None,
                intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD, horizon=HISTORY_HORIZON,
-               write_mzML=True):
+               write_mzML=True, store_obs=True):
     if METHOD_DQN in method:
         assert model is not None
     if METHOD_PPO in method:
@@ -97,7 +96,8 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
             # store new episodic information
             if obs is not None:
-                episode.add_step_data(action, action_probs, obs, reward, info)
+                obs_to_store = obs if store_obs else None
+                episode.add_step_data(action, action_probs, obs_to_store, reward, info)
 
             if print_reward and episode.num_steps % 500 == 0:
                 print('steps\t', episode.num_steps, '\ttotal rewards\t',

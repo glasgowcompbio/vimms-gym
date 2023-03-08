@@ -142,3 +142,5 @@ notebooks/QCB_resimulated_medium/optimise_baselines
 notebooks/QCB_resimulated_medium/check_reward
 notebooks/QCB_resimulated_medium/DQN
 tune
+notebooks/QCB_resimulated_large/DQN_10.0E6
+QCB_chems_large.p
