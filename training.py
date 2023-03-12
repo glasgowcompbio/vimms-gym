@@ -7,6 +7,7 @@ from pprint import pprint
 from loguru import logger
 from optuna.pruners import MedianPruner
 from optuna.visualization import plot_optimization_history, plot_param_importances
+from sb3_contrib.common.wrappers import ActionMasker
 
 from vimms_gym.wrappers import HistoryWrapper, flatten_dict_observations
 
@@ -19,7 +20,7 @@ import optuna
 import torch
 
 from stable_baselines3 import PPO, DQN
-from sb3_contrib import RecurrentPPO
+from sb3_contrib import RecurrentPPO, MaskablePPO
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.utils import set_random_seed
@@ -27,13 +28,15 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CheckpointCallback
 
 from tune import sample_dqn_params, sample_ppo_params, TrialEvalCallback
-from vimms_gym.experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, \
+from vimms_gym.experiments import preset_qcb_small, ENV_QCB_SMALL_GAUSSIAN, \
+    ENV_QCB_MEDIUM_GAUSSIAN, \
     ENV_QCB_LARGE_GAUSSIAN, ENV_QCB_SMALL_EXTRACTED, ENV_QCB_MEDIUM_EXTRACTED, \
     ENV_QCB_LARGE_EXTRACTED, preset_qcb_medium, preset_qcb_large
 
 from vimms.Common import create_if_not_exist
 from vimms_gym.env import DDAEnv
-from vimms_gym.common import HISTORY_HORIZON, MAX_EVAL_TIME_PER_EPISODE, METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
+from vimms_gym.common import HISTORY_HORIZON, MAX_EVAL_TIME_PER_EPISODE, METHOD_PPO, \
+    METHOD_PPO_RECURRENT, METHOD_DQN, ALPHA, BETA, EVAL_METRIC_REWARD, \
     EVAL_METRIC_F1, EVAL_METRIC_COVERAGE_PROP, EVAL_METRIC_INTENSITY_PROP, \
     EVAL_METRIC_MS1_MS2_RATIO, EVAL_METRIC_EFFICIENCY, GYM_ENV_NAME, GYM_NUM_ENV, USE_SUBPROC
 
@@ -57,7 +60,7 @@ def train(model_name, timesteps, horizon, params, max_peaks, out_dir, out_file, 
         name_prefix='%s_checkpoint' % model_name)
     log_interval = 1 if verbose == 2 else 4
     model.learn(total_timesteps=timesteps, callback=checkpoint_callback, log_interval=log_interval)
-    
+
     if out_file is None:
         out_file = '%s_%s.zip' % (GYM_ENV_NAME, model_name)
     fname = os.path.join(out_dir, out_file)
@@ -87,7 +90,8 @@ def tune(model_name, timesteps, horizon, params, max_peaks, out_dir,
                                 pruner=pruner, direction='maximize')
     try:
         objective = Objective(model_name, timesteps, horizon, params, max_peaks, out_dir,
-                              n_evaluations, n_eval_episodes, eval_metric, max_eval_time_per_episode,
+                              n_evaluations, n_eval_episodes, eval_metric,
+                              max_eval_time_per_episode,
                               tune_model, tune_reward, verbose=verbose)
         study.optimize(objective, n_trials=n_trials, catch=(ValueError,))
     except KeyboardInterrupt:
@@ -119,7 +123,7 @@ def tune(model_name, timesteps, horizon, params, max_peaks, out_dir,
 
 class Objective(object):
     def __init__(self, model_name, timesteps, horizon, params, max_peaks, out_dir,
-                 n_evaluations, n_eval_episodes, eval_metric, max_eval_time_per_episode, 
+                 n_evaluations, n_eval_episodes, eval_metric, max_eval_time_per_episode,
                  tune_model, tune_reward, verbose=0):
         self.model_name = model_name
         self.timesteps = timesteps
@@ -180,9 +184,9 @@ class Objective(object):
         optuna_eval_freq = max(optuna_eval_freq // GYM_NUM_ENV,
                                1)  # adjust for multiple environments
         eval_callback = TrialEvalCallback(
-            eval_env, trial, self.eval_metric, self.n_eval_episodes, 
+            eval_env, trial, self.eval_metric, self.n_eval_episodes,
             optuna_eval_freq, self.max_eval_time_per_episode,
-            deterministic=True, verbose=self.verbose, 
+            deterministic=True, verbose=self.verbose,
             best_model_save_path=self.out_dir,
             log_path=self.out_dir
         )
@@ -222,11 +226,12 @@ def init_model(model_name, model_params, env, out_dir=None, verbose=0):
 
     model = None
     if model_name == METHOD_PPO:
-        model = PPO('MlpPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
+        model = MaskablePPO('MlpPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
                     **model_params)
     elif model_name == METHOD_PPO_RECURRENT:
-        model = RecurrentPPO('MlpLstmPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
-                    **model_params)        
+        model = RecurrentPPO('MlpLstmPolicy', env, tensorboard_log=tensorboard_log,
+                             verbose=verbose,
+                             **model_params)
     elif model_name == METHOD_DQN:
         model = DQN('MlpPolicy', env, tensorboard_log=tensorboard_log, verbose=verbose,
                     **model_params)
@@ -241,6 +246,10 @@ def set_torch_threads():
     torch.set_num_threads(torch_threads)
 
 
+def mask_fn(env):
+    return env.valid_action_mask()
+
+
 def make_environment(max_peaks, params, horizon):
     def make_env(rank, seed=0):
         def _init():
@@ -250,6 +259,7 @@ def make_environment(max_peaks, params, horizon):
 
             env = flatten_dict_observations(env)
             env = HistoryWrapper(env, horizon=horizon)
+            env = ActionMasker(env, mask_fn)
             env = Monitor(env)
             return env
 
@@ -295,7 +305,8 @@ if __name__ == '__main__':
     parser.add_argument('--eval_freq', default=EVAL_FREQ, type=float,
                         help='Frequency of intermediate evaluation steps before pruning an '
                              'episode in optuna tuning')
-    parser.add_argument('--max_eval_time_per_episode', default=MAX_EVAL_TIME_PER_EPISODE, type=float,
+    parser.add_argument('--max_eval_time_per_episode', default=MAX_EVAL_TIME_PER_EPISODE,
+                        type=float,
                         help='Maximum time allowed to run one evaluation episode in a trial '
                              'during optuna tuning')
     parser.add_argument('--eval_metric', choices=[
@@ -349,8 +360,9 @@ if __name__ == '__main__':
     # actually train the model here
     if args.tune_model or args.tune_reward:
         tune(model_name, args.timesteps, args.horizon, params, max_peaks, out_dir, args.n_trials,
-            args.n_eval_episodes, int(args.eval_freq), args.eval_metric, args.max_eval_time_per_episode,
-            args.tune_model, args.tune_reward, verbose=args.verbose)
+             args.n_eval_episodes, int(args.eval_freq), args.eval_metric,
+             args.max_eval_time_per_episode,
+             args.tune_model, args.tune_reward, verbose=args.verbose)
     else:
-        train(model_name, args.timesteps, args.horizon, params, max_peaks, out_dir, args.out_file, 
-            verbose=args.verbose)
+        train(model_name, args.timesteps, args.horizon, params, max_peaks, out_dir, args.out_file,
+              verbose=args.verbose)

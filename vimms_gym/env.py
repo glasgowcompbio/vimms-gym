@@ -423,6 +423,10 @@ class DDAEnv(gym.Env):
 
         return self.state, self.last_reward, self.episode_done, info
 
+    def valid_action_mask(self):
+        mask = self.state['valid_actions'].astype(bool)
+        return mask
+
     def _one_step(self, action, scan_to_process):
         """
         Advance the simulation by processing one scan

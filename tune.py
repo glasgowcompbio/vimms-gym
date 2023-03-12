@@ -287,9 +287,11 @@ class TrialEvalCallback(EvalCallback):
         episode_lengths = []
         start = timer()
         while episode_count < episode_count_target:
+            valid_action_array = env.valid_action_mask()
             actions, states = model.predict(observations, state=states,
                                             episode_start=episode_starts,
-                                            deterministic=deterministic)
+                                            deterministic=deterministic,
+                                            action_masks=valid_action_array)
             observations, rewards, dones, infos = env.step(actions)
             episode_starts = dones
             current_reward += rewards[0]
