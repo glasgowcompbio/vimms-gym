@@ -18,7 +18,7 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, RENDER_HUMAN, RENDER_RGB_ARRAY, \
     render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, CLIPPED_INTENSITY_LOW, \
-    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE
+    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA
 from vimms_gym.env_utils import scale_intensities, update_feature_roi
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
@@ -293,7 +293,7 @@ class DDAEnv(gym.Env):
 
             # set the ROI linked to this feature to be fragmented
             if f.roi is not None:  # FIXME: it shouldn't happen?
-                f.roi.fragmented()
+                f.roi.fragmented(current_rt)
 
         except IndexError:  # idx selects a non-existing feature
             pass
@@ -680,7 +680,8 @@ class DDAEnv(gym.Env):
             spike_noise = None
 
         ionisation_mode = env_params['ionisation_mode']
-        mass_spec = IndependentMassSpectrometer(ionisation_mode, chems, spike_noise=spike_noise)
+        mass_spec = IndependentMassSpectrometer(ionisation_mode, chems, spike_noise=spike_noise,
+                                                skip_ms2_spectra_generation=SKIP_MS2_SPECTRA)
         return mass_spec
 
     def _reset_controller(self, env_params):

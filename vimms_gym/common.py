@@ -4,6 +4,9 @@ import socket
 
 from vimms.Evaluation import evaluate_simulated_env
 
+# do not generate the proper MS2 spectra during simulation, only dummy spectra
+SKIP_MS2_SPECTRA = True
+
 MS1_REWARD = 0.1
 MS1_REWARD_SHAPE = 2
 INVALID_MOVE_REWARD = -1.0
