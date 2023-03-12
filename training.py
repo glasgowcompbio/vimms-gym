@@ -7,7 +7,7 @@ from pprint import pprint
 from loguru import logger
 from optuna.pruners import MedianPruner
 from optuna.visualization import plot_optimization_history, plot_param_importances
-from sb3_contrib.common.wrappers import ActionMasker
+
 
 from vimms_gym.wrappers import HistoryWrapper, flatten_dict_observations
 
@@ -259,7 +259,6 @@ def make_environment(max_peaks, params, horizon):
 
             env = flatten_dict_observations(env)
             env = HistoryWrapper(env, horizon=horizon)
-            env = ActionMasker(env, mask_fn)
             env = Monitor(env)
             return env
 

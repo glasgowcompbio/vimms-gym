@@ -423,7 +423,7 @@ class DDAEnv(gym.Env):
 
         return self.state, self.last_reward, self.episode_done, info
 
-    def valid_action_mask(self):
+    def action_masks(self):
         mask = self.state['valid_actions'].astype(bool)
         return mask
 
