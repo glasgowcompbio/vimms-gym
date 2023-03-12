@@ -2,6 +2,7 @@ name: vimms-gym
 channels:
   - defaults
 dependencies:
+  - python=3.10
   - numpy
   - pandas
   - scipy
