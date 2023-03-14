@@ -184,7 +184,7 @@ class Objective(object):
         optuna_eval_freq = max(optuna_eval_freq // GYM_NUM_ENV,
                                1)  # adjust for multiple environments
         eval_callback = TrialEvalCallback(
-            eval_env, trial, self.eval_metric, self.n_eval_episodes,
+            eval_env, self.model_name, trial, self.eval_metric, self.n_eval_episodes,
             optuna_eval_freq, self.max_eval_time_per_episode,
             deterministic=True, verbose=self.verbose,
             best_model_save_path=self.out_dir,

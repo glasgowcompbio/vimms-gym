@@ -13,7 +13,7 @@ from stable_baselines3.common.vec_env import sync_envs_normalization
 from vimms.Evaluation import EvaluationData
 
 from vimms_gym.common import linear_schedule, EVAL_METRIC_REWARD, EVAL_METRIC_F1, \
-    MAX_EVAL_TIME_PER_EPISODE, evaluate
+    MAX_EVAL_TIME_PER_EPISODE, evaluate, METHOD_PPO
 
 
 def sample_dqn_params(trial, tune_model, tune_reward):
@@ -156,8 +156,9 @@ def sample_ppo_params(trial, tune_model, tune_reward):
 
 
 class TrialEvalCallback(EvalCallback):
-    def __init__(self, eval_env, trial, eval_metric, n_eval_episodes, eval_freq, max_eval_time_per_episode,
-                 deterministic=True, verbose=0, best_model_save_path=None, log_path=None):
+    def __init__(self, eval_env, model_name, trial, eval_metric, n_eval_episodes, eval_freq,
+                 max_eval_time_per_episode, deterministic=True, verbose=0,
+                 best_model_save_path=None, log_path=None):
         super().__init__(
             eval_env=eval_env,
             n_eval_episodes=n_eval_episodes,
@@ -172,6 +173,7 @@ class TrialEvalCallback(EvalCallback):
         self.is_pruned = False
         self.eval_metric = eval_metric
         self.max_eval_time_per_episode = max_eval_time_per_episode
+        self.model_name = model_name
 
     def _init_callback(self) -> None:
         # Does not work in some corner cases, where the wrapper is not the same
@@ -287,9 +289,17 @@ class TrialEvalCallback(EvalCallback):
         episode_lengths = []
         start = timer()
         while episode_count < episode_count_target:
-            actions, states = model.predict(observations, state=states,
-                                            episode_start=episode_starts,
-                                            deterministic=deterministic)
+            if self.model_name == METHOD_PPO: # maskable PPO
+                action_masks = env.action_masks()
+                actions, states = model.predict(observations, state=states,
+                                                episode_start=episode_starts,
+                                                deterministic=deterministic,
+                                                action_masks=action_masks)
+            else: # DQN doesn't use action masking yet
+                actions, states = model.predict(observations, state=states,
+                                                episode_start=episode_starts,
+                                                deterministic=deterministic)
+
             observations, rewards, dones, infos = env.step(actions)
             episode_starts = dones
             current_reward += rewards[0]
