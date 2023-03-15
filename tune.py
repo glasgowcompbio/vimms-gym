@@ -285,12 +285,15 @@ class TrialEvalCallback(EvalCallback):
         states = None
         episode_starts = np.ones((env.num_envs,), dtype=bool)
 
+
         episode_rewards = []
         episode_lengths = []
         start = timer()
         while episode_count < episode_count_target:
+            inner_env = env.envs[0].env
+
             if self.model_name == METHOD_PPO: # maskable PPO
-                action_masks = env.action_masks()
+                action_masks = inner_env.action_masks()
                 actions, states = model.predict(observations, state=states,
                                                 episode_start=episode_starts,
                                                 deterministic=deterministic,
@@ -330,7 +333,6 @@ class TrialEvalCallback(EvalCallback):
 
             # store previous results for evaluation before 'done'
             # this needs to be here, because VecEnv is automatically reset when done
-            inner_env = env.envs[0].env
             eval_data = EvaluationData(inner_env.vimms_env)
 
         return episode_rewards, episode_lengths
