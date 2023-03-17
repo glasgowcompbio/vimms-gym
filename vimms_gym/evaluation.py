@@ -84,11 +84,12 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
         while not done:  # repeat until episode is done
 
             unwrapped_obs = env.env.env.state  # access the state attribute in DDAEnv
+            action_masks = env.env.env.action_masks()
 
             # select an action depending on the observation and method
             action, action_probs, states = pick_action(
                 method, obs, unwrapped_obs, model, env.features, N, min_ms1_intensity,
-                states=states, episode_starts=episode_starts)
+                states=states, episode_starts=episode_starts, action_masks=action_masks)
 
             # make one step through the simulation
             obs, reward, done, info = env.step(action)
@@ -129,7 +130,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
 
 def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensity,
-                states=None, episode_starts=None, get_action_probs=False):
+                states=None, episode_starts=None, get_action_probs=False, action_masks=None):
     action_probs = []
 
     if method != METHOD_PPO_RECURRENT:
@@ -145,7 +146,7 @@ def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensit
     elif method == METHOD_TOPN:
         action = topN_policy(unwrapped_obs, features, N, min_ms1_intensity)
     elif method == METHOD_PPO:
-        action, states = model.predict(obs, deterministic=True)
+        action, states = model.predict(obs, deterministic=True, action_masks=action_masks)
         action_probs = None
         if get_action_probs:
             action_probs = get_ppo_action_probs(model, obs)
