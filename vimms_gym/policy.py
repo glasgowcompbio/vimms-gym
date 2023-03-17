@@ -13,22 +13,19 @@ def fullscan_policy(obs):
     return ms1_action
 
 
-def random_policy(obs):
+def random_policy(obs, valid=False):
     """
     A policy function that selects a random valid move from the observation.
     """
 
-    # randomly choose one valid action based on the observation
-    # if there are some ions to fragment, we could either fragment one or perform an MS1 scan
-    # if nothing to fragment, then perform an MS1 scan
+    if not valid: # randomly choose one valid action, even if it's invalid
+        action = np.random.choice(len(obs['valid_actions']))
 
-    # harder random baseline -- only chooses among valid actions
-    # valid_actions = obs['valid_actions']
-    # nnz = np.nonzero(valid_actions)[0]  # valid_actions are the non-zeros
-    # nnz_idx = np.random.choice(len(nnz))
-    # action = nnz[nnz_idx]
+    else: # harder random baseline -- only chooses among valid actions
+        valid_actions = obs['valid_actions']
+        valid_indices = np.where(valid_actions)[0]
+        action = np.random.choice(valid_indices)
 
-    action = np.random.choice(len(obs['valid_actions']))
     return action
 
 
