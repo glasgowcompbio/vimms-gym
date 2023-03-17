@@ -153,25 +153,26 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
 
     elif model_name == METHOD_PPO:
 
-        # top-5 best reward with 1E5 timesteps, but the fastest (~5 mins)
+        # best looking balance between reward, training time
+        # and other parameters from tensorboard
         # alpha   = 0.25
         # beta    = 0.50
         # horizon = 4
 
-        n_steps = 512
-        batch_size = 512
-        gamma = 0.90
-        learning_rate = 0.557248151
-        lr_schedule = 'linear'
-        ent_coef = 5.40E-08
-        clip_range = 0.3
-        n_epochs = 1
-        gae_lambda = 0.98
-        max_grad_norm = 0.5
-        vf_coef = 0.524370133
+        n_steps = 1024
+        batch_size = 128
+        gamma = 0.98
+        learning_rate = 2.82E-05
+        lr_schedule = 'constant'
+        ent_coef = 0.021632204
+        clip_range = 0.1
+        n_epochs = 10
+        gae_lambda = 0.99
+        max_grad_norm = 0.8
+        vf_coef = 0.740334825
         ortho_init = False
         activation_fn = 'relu'
-        net_arch = 'large'
+        net_arch = 'medium'
 
         if lr_schedule == 'linear':
             learning_rate = linear_schedule(learning_rate)
@@ -226,90 +227,15 @@ def preset_qcb_large(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
     if model_name == METHOD_DQN:
 
-        # same as preset_qcb_medium()
-        # alpha   = 0.25
-        # beta    = 0.50
-        # horizon = 4
-        gamma = 0.95
-        learning_rate = 0.00014450137513290646
-        batch_size = 256
-        buffer_size = 10000
-        train_freq = 1
-        subsample_steps = 2
-        gradient_steps = max(train_freq // subsample_steps, 1)
-        exploration_fraction = 0.27797033409246663
-        exploration_final_eps = 0.005589071654866951
-        target_update_interval = 20000
-        learning_starts = 2000
-        hidden_nodes = 256
-        policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
-        params['model'] = {
-            'gamma': gamma,
-            'learning_rate': learning_rate,
-            'batch_size': batch_size,
-            'buffer_size': buffer_size,
-            'train_freq': train_freq,
-            'gradient_steps': gradient_steps,
-            'exploration_fraction': exploration_fraction,
-            'exploration_final_eps': exploration_final_eps,
-            'target_update_interval': target_update_interval,
-            'learning_starts': learning_starts,
-            'policy_kwargs': policy_kwargs
-        }
+        medium_params = preset_qcb_medium(model_name, alpha=alpha, beta=beta,
+                                          extract_chromatograms=extract_chromatograms)
+        params['model'] = medium_params['model']
+
     elif model_name == METHOD_PPO:
 
-        # same as preset_qcb_medium()
-        # alpha   = 0.25
-        # beta    = 0.50
-        # horizon = 4
-
-        n_steps = 512
-        batch_size = 512
-        gamma = 0.90
-        learning_rate = 0.557248151
-        lr_schedule = 'linear'
-        ent_coef = 5.40E-08
-        clip_range = 0.3
-        n_epochs = 1
-        gae_lambda = 0.98
-        max_grad_norm = 0.5
-        vf_coef = 0.524370133
-        ortho_init = False
-        activation_fn = 'relu'
-        net_arch = 'large'
-
-        if lr_schedule == 'linear':
-            learning_rate = linear_schedule(learning_rate)
-
-        activation_fn = \
-        {'tanh': nn.Tanh, 'relu': nn.ReLU, 'elu': nn.ELU, 'leaky_relu': nn.LeakyReLU}[
-            activation_fn]
-
-        net_arch = {
-            'small': [dict(pi=[64, 64], vf=[64, 64])],
-            'medium': [dict(pi=[256, 256], vf=[256, 256])],
-            'large': [dict(pi=[512, 512], vf=[512, 512])],
-        }[net_arch]
-
-        params['model'] = {
-            'n_steps': n_steps,
-            'batch_size': batch_size,
-            'gamma': gamma,
-            'learning_rate': learning_rate,
-            'ent_coef': ent_coef,
-            'clip_range': clip_range,
-            'n_epochs': n_epochs,
-            'gae_lambda': gae_lambda,
-            'max_grad_norm': max_grad_norm,
-            'vf_coef': vf_coef,
-            # 'sde_sample_freq': sde_sample_freq,
-            'policy_kwargs': dict(
-                # log_std_init=log_std_init,
-                net_arch=net_arch,
-                activation_fn=activation_fn,
-                ortho_init=ortho_init,
-            ),
-        }
+        medium_params = preset_qcb_medium(model_name, alpha=alpha, beta=beta,
+                                          extract_chromatograms=extract_chromatograms)
+        params['model'] = medium_params['model']
 
     return params, max_peaks
 
