@@ -15,8 +15,8 @@ np.random.seed(0)
 
 preset = "QCB_resimulated_medium"
 model_name = "DQN"
-alpha = 0.25
-beta = 0.25
+alpha = 0.00
+beta = 0.00
 
 # choose one preset and generate parameters for it
 presets = {

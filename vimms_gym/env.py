@@ -80,16 +80,16 @@ class DDAEnv(gym.Env):
             'excluded': spaces.MultiBinary(self.max_peaks),
 
             # roi features
-            'roi_length': spaces.Box(
-                low=0, high=1, shape=(self.max_peaks,)),
-            'roi_elapsed_time_since_last_frag': spaces.Box(
-                low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensity_at_last_frag': spaces.Box(
-                low=lo, high=hi, shape=(self.max_peaks,)),
-            'roi_min_intensity_since_last_frag': spaces.Box(
-                low=lo, high=hi, shape=(self.max_peaks,)),
-            'roi_max_intensity_since_last_frag': spaces.Box(
-                low=lo, high=hi, shape=(self.max_peaks,)),
+            # 'roi_length': spaces.Box(
+            #     low=0, high=1, shape=(self.max_peaks,)),
+            # 'roi_elapsed_time_since_last_frag': spaces.Box(
+            #     low=0, high=1, shape=(self.max_peaks,)),
+            # 'roi_intensity_at_last_frag': spaces.Box(
+            #     low=lo, high=hi, shape=(self.max_peaks,)),
+            # 'roi_min_intensity_since_last_frag': spaces.Box(
+            #     low=lo, high=hi, shape=(self.max_peaks,)),
+            # 'roi_max_intensity_since_last_frag': spaces.Box(
+            #     low=lo, high=hi, shape=(self.max_peaks,)),
 
             # roi intensity features
             'roi_intensities_2': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
@@ -127,11 +127,11 @@ class DDAEnv(gym.Env):
             'excluded': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi features
-            'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_elapsed_time_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensity_at_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_min_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_max_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            # 'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
+            # 'roi_elapsed_time_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            # 'roi_intensity_at_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            # 'roi_min_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            # 'roi_max_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi intensity features
             'roi_intensities_2': np.zeros(self.max_peaks, dtype=np.float32),
@@ -246,12 +246,12 @@ class DDAEnv(gym.Env):
 
         state['intensities'] = scale_intensities(
             state['intensities'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_intensity_at_last_frag'] = scale_intensities(
-            state['roi_intensity_at_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_min_intensity_since_last_frag'] = scale_intensities(
-            state['roi_min_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_max_intensity_since_last_frag'] = scale_intensities(
-            state['roi_max_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        # state['roi_intensity_at_last_frag'] = scale_intensities(
+        #     state['roi_intensity_at_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        # state['roi_min_intensity_since_last_frag'] = scale_intensities(
+        #     state['roi_min_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        # state['roi_max_intensity_since_last_frag'] = scale_intensities(
+        #     state['roi_max_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
         state['roi_intensities_2'] = scale_intensities(
             state['roi_intensities_2'], num_features, MAX_OBSERVED_LOG_INTENSITY)
         state['roi_intensities_3'] = scale_intensities(

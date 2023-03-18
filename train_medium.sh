@@ -6,8 +6,8 @@ timesteps=2E5
 repeat=1
 verbose=2
 preset="QCB_resimulated_medium"
-alphas=( 0.20 )
-betas=( 0.40 )
+alphas=( 0.00 )
+betas=( 0.00 )
 horizons=( 4 )
 
 for (( i=0; i<${repeat}; i++ ))
