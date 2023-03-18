@@ -1,13 +1,13 @@
 #!/bin/bash
 
 env_name="DDAEnv"
-model_name="DQN"
-timesteps=1E6
+model_name="PPO"
+timesteps=2E5
 repeat=1
 verbose=2
 preset="QCB_resimulated_medium"
-alphas=( 0.25 0.50 0.75 )
-betas=( 0.50 )
+alphas=( 0.20 )
+betas=( 0.40 )
 horizons=( 4 )
 
 for (( i=0; i<${repeat}; i++ ))

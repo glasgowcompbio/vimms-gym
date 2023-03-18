@@ -521,7 +521,7 @@ class DDAEnv(gym.Env):
                     chem = frag_event.chem
 
                     # compute ms2 reward
-                    reward = self._compute_ms2_reward(chem, chem_frag_int)
+                    reward = self._compute_ms2_reward(chem, chem_frag_int, frag_event.query_rt)
 
                     # store new intensity into dictionary
                     self.frag_chem_intensity[chem] = chem_frag_int
@@ -581,36 +581,9 @@ class DDAEnv(gym.Env):
         reward = 1 - np.exp(-alpha * x)
         return reward
 
-    def _compute_ms2_reward(self, chem, chem_frag_int):
-        """
-        Compute the reward for selecting an MS2 fragmentation action for a given
-        precursor ion and fragmentation intensity.
+    def _compute_ms2_reward(self, chem, chem_frag_int, frag_time):
 
-        Args:
-            chem (Chemical): A chemical object in ViMMS that were fragmented by
-                             selecting a precursor ion
-            chem_frag_int (float): The intensity of at which the fragmentation occured
-
-        Returns:
-            float: The MS2 reward, a value between 0 and 1. The reward is based on
-            two components: a coverage reward and an intensity reward. The coverage
-            reward is a constant reward of 1.0 if the chemical has not been
-            fragmented before, or 0.0 otherwise. The intensity reward is based on
-            the difference between the current fragmentation intensity and the
-            previous fragmentation intensity for the same chemical, multiplied
-            by a scaling parameter beta, and normalized by the maximum intensity
-            of the chemical. The intensity reward is weighted by a scaling
-            parameter alpha that controls the balance between coverage and intensity
-            rewards.
-
-        The MS2 reward function implemented here is based on the formula:
-
-            reward = alpha * coverage_reward + (1 - alpha) * intensity_reward
-
-        where alpha is a scaling parameter that controls the balance between coverage
-        and intensity rewards (should be between 0 and 1), and coverage_reward and
-        intensity_reward are calculated as follows:
-        """
+        # coverage reward
         if chem not in self.frag_chem_intensity:
             chem_last_frag_int = 0.0
             coverage_reward = 1.0
@@ -618,14 +591,25 @@ class DDAEnv(gym.Env):
             chem_last_frag_int = self.frag_chem_intensity[chem]
             coverage_reward = 0.0
 
-        intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
-        log_intensity_reward = np.log(abs(intensity_reward))
-        scaled_log_intensity_reward = log_intensity_reward / MAX_OBSERVED_LOG_INTENSITY
-        if intensity_reward < 0:
-            scaled_log_intensity_reward = scaled_log_intensity_reward * -1
-        intensity_reward = np.clip(scaled_log_intensity_reward, 0, 1)
+        # intensity reward
+        log_chem_frag_int = np.log(chem_frag_int)
+        normalized_log_intensity = log_chem_frag_int / MAX_OBSERVED_LOG_INTENSITY
+        intensity_reward = np.clip(normalized_log_intensity, 0, 1)
 
-        reward = (self.alpha * coverage_reward) + ((1 - self.alpha) * intensity_reward)
+        # apex reward
+        chrom = chem.chromatogram
+        min_rt = chrom.min_rt
+        max_rt = chrom.max_rt
+        rel_frag_time = frag_time - chem.rt
+        apex_time = chrom.get_apex_rt()
+        normalized_frag_time = (rel_frag_time - min_rt) / (max_rt - min_rt)
+        normalized_apex_time = (apex_time - min_rt) / (max_rt - min_rt)
+        apex_distance = abs(normalized_frag_time - normalized_apex_time)
+        apex_reward = 1 - apex_distance
+        assert 0 <= apex_reward <= 1
+
+        reward = (self.alpha * coverage_reward) + (self.beta * intensity_reward) + \
+                 ((1 - self.alpha - self.beta) * apex_reward)
         return reward
 
     def reset(self, chems=None):
