@@ -56,7 +56,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                N=10, min_ms1_intensity=5000, model=None,
                print_eval=False, print_reward=False, mzml_prefix=None,
                intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD, horizon=HISTORY_HORIZON,
-               write_mzML=True, store_obs=True):
+               write_mzML=True, store_obs=True, valid_random=False):
     if METHOD_DQN in method:
         assert model is not None
     if METHOD_PPO in method:
@@ -89,7 +89,8 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
             # select an action depending on the observation and method
             action, action_probs, states = pick_action(
                 method, obs, unwrapped_obs, model, env.features, N, min_ms1_intensity,
-                states=states, episode_starts=episode_starts, action_masks=action_masks)
+                states=states, episode_starts=episode_starts, action_masks=action_masks,
+                valid_random=valid_random)
 
             # make one step through the simulation
             obs, reward, done, info = env.step(action)
@@ -130,7 +131,8 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
 
 def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensity,
-                states=None, episode_starts=None, get_action_probs=False, action_masks=None):
+                states=None, episode_starts=None, get_action_probs=False, action_masks=None,
+                valid_random=False):
     action_probs = []
 
     if method != METHOD_PPO_RECURRENT:
@@ -140,7 +142,7 @@ def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensit
             method = METHOD_PPO
 
     if method == METHOD_RANDOM:
-        action = random_policy(unwrapped_obs)
+        action = random_policy(unwrapped_obs, valid=valid_random)
     elif method == METHOD_FULLSCAN:
         action = fullscan_policy(unwrapped_obs)
     elif method == METHOD_TOPN:
