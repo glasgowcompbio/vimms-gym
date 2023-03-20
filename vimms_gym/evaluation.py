@@ -8,7 +8,7 @@ from vimms_gym.common import EVAL_F1_INTENSITY_THRESHOLD, HISTORY_HORIZON, METHO
 from vimms_gym.env import DDAEnv
 from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, get_ppo_action_probs, \
     get_dqn_q_values
-from vimms_gym.wrappers import HistoryWrapper, flatten_dict_observations
+from vimms_gym.wrappers import flatten_dict_observations
 
 
 class Episode():
@@ -73,7 +73,6 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
         env = DDAEnv(max_peaks, env_params)
         env = flatten_dict_observations(env)
-        env = HistoryWrapper(env, horizon=horizon)
         obs = env.reset(chems=chems)
         states = None
         done = False

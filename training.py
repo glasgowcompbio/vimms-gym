@@ -9,7 +9,7 @@ from optuna.pruners import MedianPruner
 from optuna.visualization import plot_optimization_history, plot_param_importances
 
 
-from vimms_gym.wrappers import HistoryWrapper, flatten_dict_observations
+from vimms_gym.wrappers import flatten_dict_observations
 
 sys.path.append('.')
 
@@ -175,7 +175,6 @@ class Objective(object):
         # print('Creating evaluation environment with params', self.params)
         eval_env = DDAEnv(self.max_peaks, self.params)
         eval_env = flatten_dict_observations(eval_env)
-        eval_env = HistoryWrapper(eval_env, horizon=self.horizon)
         eval_env = Monitor(eval_env)
 
         # Create the callback that will periodically evaluate
@@ -258,7 +257,6 @@ def make_environment(max_peaks, params, horizon):
             env.seed(rank)
 
             env = flatten_dict_observations(env)
-            env = HistoryWrapper(env, horizon=horizon)
             env = Monitor(env)
             return env
 
