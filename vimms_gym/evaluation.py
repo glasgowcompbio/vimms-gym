@@ -91,7 +91,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
                 states=states, episode_starts=episode_starts, action_masks=action_masks,
                 valid_random=valid_random)
 
-            print(action, unwrapped_obs)
+            # print(action, unwrapped_obs)
 
             # make one step through the simulation
             obs, reward, done, info = env.step(action)
