@@ -80,22 +80,36 @@ class DDAEnv(gym.Env):
             'excluded': spaces.MultiBinary(self.max_peaks),
 
             # roi features
-            # 'roi_length': spaces.Box(
-            #     low=0, high=1, shape=(self.max_peaks,)),
-            # 'roi_elapsed_time_since_last_frag': spaces.Box(
-            #     low=0, high=1, shape=(self.max_peaks,)),
-            # 'roi_intensity_at_last_frag': spaces.Box(
-            #     low=lo, high=hi, shape=(self.max_peaks,)),
-            # 'roi_min_intensity_since_last_frag': spaces.Box(
-            #     low=lo, high=hi, shape=(self.max_peaks,)),
-            # 'roi_max_intensity_since_last_frag': spaces.Box(
-            #     low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_length': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_elapsed_time_since_last_frag': spaces.Box(
+                low=0, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_at_last_frag': spaces.Box(
+                low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_min_intensity_since_last_frag': spaces.Box(
+                low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_max_intensity_since_last_frag': spaces.Box(
+                low=lo, high=hi, shape=(self.max_peaks,)),
 
             # roi intensity features
             'roi_intensities_2': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
             'roi_intensities_3': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
             'roi_intensities_4': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
             'roi_intensities_5': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_intensities_6': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_intensities_7': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_intensities_8': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            'roi_intensities_9': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            'avg_roi_intensities': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+
+            'roi_intensity_diff_1': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_diff_2': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_diff_3': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_diff_4': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_diff_5': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_diff_6': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_diff_7': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
+            'roi_intensity_diff_8': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
 
             # valid action indicators, last action and current ms level
             'valid_actions': spaces.MultiBinary(self.in_dim),
@@ -127,17 +141,31 @@ class DDAEnv(gym.Env):
             'excluded': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi features
-            # 'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
-            # 'roi_elapsed_time_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            # 'roi_intensity_at_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            # 'roi_min_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            # 'roi_max_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_elapsed_time_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_at_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_min_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_max_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi intensity features
             'roi_intensities_2': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_intensities_3': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_intensities_4': np.zeros(self.max_peaks, dtype=np.float32),
             'roi_intensities_5': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_6': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_7': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_8': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensities_9': np.zeros(self.max_peaks, dtype=np.float32),
+            'avg_roi_intensities': np.zeros(self.max_peaks, dtype=np.float32),
+
+            'roi_intensity_diff_1': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_diff_2': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_diff_3': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_diff_4': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_diff_5': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_diff_6': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_diff_7': np.zeros(self.max_peaks, dtype=np.float32),
+            'roi_intensity_diff_8': np.zeros(self.max_peaks, dtype=np.float32),
 
             # valid action indicators
             'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
@@ -244,14 +272,35 @@ class DDAEnv(gym.Env):
                 state['valid_actions'][i] = 0  # except when it's below min ms1 intensity
             update_feature_roi(f, i, state)  # update ROI information for this feature
 
+        state['roi_intensity_at_last_frag'] = scale_intensities(
+            state['roi_intensity_at_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_min_intensity_since_last_frag'] = scale_intensities(
+            state['roi_min_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_max_intensity_since_last_frag'] = scale_intensities(
+            state['roi_max_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+
+        state['avg_roi_intensities'] = scale_intensities(
+            state['avg_roi_intensities'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+
+        state['roi_intensity_diff_1'] = scale_intensities(
+            state['roi_intensity_diff_1'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensity_diff_2'] = scale_intensities(
+            state['roi_intensity_diff_2'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensity_diff_3'] = scale_intensities(
+            state['roi_intensity_diff_3'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensity_diff_4'] = scale_intensities(
+            state['roi_intensity_diff_4'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensity_diff_5'] = scale_intensities(
+            state['roi_intensity_diff_5'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensity_diff_6'] = scale_intensities(
+            state['roi_intensity_diff_6'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensity_diff_7'] = scale_intensities(
+            state['roi_intensity_diff_7'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensity_diff_8'] = scale_intensities(
+            state['roi_intensity_diff_8'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+
         state['intensities'] = scale_intensities(
             state['intensities'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        # state['roi_intensity_at_last_frag'] = scale_intensities(
-        #     state['roi_intensity_at_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        # state['roi_min_intensity_since_last_frag'] = scale_intensities(
-        #     state['roi_min_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        # state['roi_max_intensity_since_last_frag'] = scale_intensities(
-        #     state['roi_max_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
         state['roi_intensities_2'] = scale_intensities(
             state['roi_intensities_2'], num_features, MAX_OBSERVED_LOG_INTENSITY)
         state['roi_intensities_3'] = scale_intensities(
@@ -260,6 +309,14 @@ class DDAEnv(gym.Env):
             state['roi_intensities_4'], num_features, MAX_OBSERVED_LOG_INTENSITY)
         state['roi_intensities_5'] = scale_intensities(
             state['roi_intensities_5'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensities_6'] = scale_intensities(
+            state['roi_intensities_6'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensities_7'] = scale_intensities(
+            state['roi_intensities_7'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensities_8'] = scale_intensities(
+            state['roi_intensities_8'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['roi_intensities_9'] = scale_intensities(
+            state['roi_intensities_9'], num_features, MAX_OBSERVED_LOG_INTENSITY)
 
         state['ms_level'] = 0
         self.elapsed_scans_since_last_ms1 = 0

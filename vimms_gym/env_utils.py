@@ -14,12 +14,17 @@ def scale_intensities(intensity_values, num_features, max_value):
     # Identify non-zero values using a boolean mask
     # Apply log transform only to non-zero values
     nonzero_mask = arr != 0
+
+    # take the log but preserve the sign later
     log_intensity_values = np.zeros_like(arr)
-    log_intensity_values[nonzero_mask] = np.log(arr[nonzero_mask])
+    log_intensity_values[nonzero_mask] = np.log(np.abs(arr[nonzero_mask]))
 
     # Scale the log-transformed intensity values to be between 0 and 1
     scaled_intensity_values = log_intensity_values / max_value
     scaled_intensity_values = np.clip(scaled_intensity_values, 0, 1)
+
+    # if the sign is initially negative, set it back
+    scaled_intensity_values = np.sign(arr) * scaled_intensity_values
 
     # set the calculation back to intensity_values
     intensity_values[:num_features] = scaled_intensity_values
@@ -31,72 +36,130 @@ def update_feature_roi(feature, i, state):
     # there should always be a live ROI for each feature
     roi = feature.roi
 
-#     # current length of this ROI (in seconds)
-#     try:
-#         roi_length = clip_value(roi.length_in_seconds, MAX_ROI_LENGTH_SECONDS)
-#     except AttributeError:  # no ROI object
-#         roi_length = 0.0
-
-#     try:
-#         # time elapsed (in seconds) since last fragmentation of this ROI
-#         val = roi.rt_list[-1] - roi.rt_list[roi.fragmented_index]
-#         roi_elapsed_time_since_last_frag = clip_value(np.log(val), MAX_ROI_LENGTH_SECONDS)
-#     except AttributeError:  # no ROI object, or never been fragmented
-#         roi_elapsed_time_since_last_frag = 0.0
-
-#     try:
-#         # intensity of this ROI at last fragmentation
-#         roi_intensity_at_last_frag = roi.intensity_list[roi.fragmented_index]
-#     except AttributeError:  # no ROI object, or never been fragmented
-#         roi_intensity_at_last_frag = 0.0
-
-#     try:
-#         # minimum intensity of this ROI since last fragmentation
-#         roi_min_intensity_since_last_frag = min(roi.intensity_list[roi.fragmented_index:])
-#     except AttributeError:  # no ROI object, or never been fragmented
-#         roi_min_intensity_since_last_frag = 0.0
-
-#     try:
-#         # maximum intensity of this ROI since last fragmentation
-#         roi_max_intensity_since_last_frag = max(roi.intensity_list[roi.fragmented_index:])
-#     except AttributeError:  # no ROI object, or never been fragmented
-#         roi_max_intensity_since_last_frag = 0.0
-
     # last few intensity values of this ROI
     roi_intensities_2 = 0.0
     roi_intensities_3 = 0.0
     roi_intensities_4 = 0.0
     roi_intensities_5 = 0.0
+    roi_intensities_6 = 0.0
+    roi_intensities_7 = 0.0
+    roi_intensities_8 = 0.0
+    roi_intensities_9 = 0.0
+    avg_intensity = 0.0
+
+    roi_intensity_diff_1 = 0.0
+    roi_intensity_diff_2 = 0.0
+    roi_intensity_diff_3 = 0.0
+    roi_intensity_diff_4 = 0.0
+    roi_intensity_diff_5 = 0.0
+    roi_intensity_diff_6 = 0.0
+    roi_intensity_diff_7 = 0.0
+    roi_intensity_diff_8 = 0.0
+
+    # current length of this ROI (in seconds)
+    try:
+        roi_length = clip_value(roi.length_in_seconds, MAX_ROI_LENGTH_SECONDS)
+    except AttributeError:  # no ROI object
+        roi_length = 0.0
+
+    try:
+        # time elapsed (in seconds) since last fragmentation of this ROI
+        val = roi.rt_list[-1] - roi.rt_list[roi.fragmented_index]
+        roi_elapsed_time_since_last_frag = clip_value(np.log(val), MAX_ROI_LENGTH_SECONDS)
+    except AttributeError:  # no ROI object, or never been fragmented
+        roi_elapsed_time_since_last_frag = 0.0
+
+    try:
+        # intensity of this ROI at last fragmentation
+        roi_intensity_at_last_frag = roi.intensity_list[roi.fragmented_index]
+    except AttributeError:  # no ROI object, or never been fragmented
+        roi_intensity_at_last_frag = 0.0
+
+    try:
+        # minimum intensity of this ROI since last fragmentation
+        roi_min_intensity_since_last_frag = min(roi.intensity_list[roi.fragmented_index:])
+    except AttributeError:  # no ROI object, or never been fragmented
+        roi_min_intensity_since_last_frag = 0.0
+
+    try:
+        # maximum intensity of this ROI since last fragmentation
+        roi_max_intensity_since_last_frag = max(roi.intensity_list[roi.fragmented_index:])
+    except AttributeError:  # no ROI object, or never been fragmented
+        roi_max_intensity_since_last_frag = 0.0
 
     if roi is not None:
         intensities = roi.intensity_list
+        avg_intensity = np.mean(intensities)
         try:
             roi_intensities_2 = intensities[-2]
+            roi_intensity_diff_1 = intensities[-1] - intensities[-2]
         except IndexError:
             pass
 
         try:
             roi_intensities_3 = intensities[-3]
+            roi_intensity_diff_2 = intensities[-2] - intensities[-3]
         except IndexError:
             pass
 
         try:
             roi_intensities_4 = intensities[-4]
+            roi_intensity_diff_3 = intensities[-3] - intensities[-4]
         except IndexError:
             pass
 
         try:
             roi_intensities_5 = intensities[-5]
+            roi_intensity_diff_4 = intensities[-4] - intensities[-5]
         except IndexError:
             pass
 
-    # state['roi_length'][i] = roi_length
-    # state['roi_elapsed_time_since_last_frag'][i] = roi_elapsed_time_since_last_frag
-    # state['roi_intensity_at_last_frag'][i] = roi_intensity_at_last_frag
-    # state['roi_min_intensity_since_last_frag'][i] = roi_min_intensity_since_last_frag
-    # state['roi_max_intensity_since_last_frag'][i] = roi_max_intensity_since_last_frag
+        try:
+            roi_intensities_6 = intensities[-6]
+            roi_intensity_diff_5 = intensities[-5] - intensities[-6]
+        except IndexError:
+            pass
+
+        try:
+            roi_intensities_7 = intensities[-7]
+            roi_intensity_diff_6 = intensities[-6] - intensities[-7]
+        except IndexError:
+            pass
+
+        try:
+            roi_intensities_8 = intensities[-8]
+            roi_intensity_diff_7 = intensities[-7] - intensities[-8]
+        except IndexError:
+            pass
+
+        try:
+            roi_intensities_9 = intensities[-9]
+            roi_intensity_diff_8 = intensities[-8] - intensities[-9]
+        except IndexError:
+            pass
+
+    state['roi_length'][i] = roi_length
+    state['roi_elapsed_time_since_last_frag'][i] = roi_elapsed_time_since_last_frag
+    state['roi_intensity_at_last_frag'][i] = roi_intensity_at_last_frag
+    state['roi_min_intensity_since_last_frag'][i] = roi_min_intensity_since_last_frag
+    state['roi_max_intensity_since_last_frag'][i] = roi_max_intensity_since_last_frag
 
     state['roi_intensities_2'][i] = roi_intensities_2
     state['roi_intensities_3'][i] = roi_intensities_3
     state['roi_intensities_4'][i] = roi_intensities_4
     state['roi_intensities_5'][i] = roi_intensities_5
+    state['roi_intensities_6'][i] = roi_intensities_6
+    state['roi_intensities_7'][i] = roi_intensities_7
+    state['roi_intensities_8'][i] = roi_intensities_8
+    state['roi_intensities_9'][i] = roi_intensities_9
+
+    state['roi_intensity_diff_1'][i] = roi_intensity_diff_1
+    state['roi_intensity_diff_2'][i] = roi_intensity_diff_2
+    state['roi_intensity_diff_3'][i] = roi_intensity_diff_3
+    state['roi_intensity_diff_4'][i] = roi_intensity_diff_4
+    state['roi_intensity_diff_5'][i] = roi_intensity_diff_5
+    state['roi_intensity_diff_6'][i] = roi_intensity_diff_6
+    state['roi_intensity_diff_7'][i] = roi_intensity_diff_7
+    state['roi_intensity_diff_8'][i] = roi_intensity_diff_8
+
+    state['avg_roi_intensities'][i] = avg_intensity
