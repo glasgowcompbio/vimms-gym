@@ -2,13 +2,13 @@
 
 env_name="DDAEnv"
 model_name="PPO"
-timesteps=2E5
+timesteps=10E6
 repeat=1
 verbose=2
 preset="QCB_resimulated_medium"
 alphas=( 0.00 )
 betas=( 0.00 )
-horizons=( 4 )
+horizons=( 1 )
 
 for (( i=0; i<${repeat}; i++ ))
 do

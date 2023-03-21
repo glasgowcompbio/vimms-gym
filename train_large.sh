@@ -6,9 +6,9 @@ timesteps=10E6
 repeat=1
 verbose=2
 preset="QCB_resimulated_large"
-alphas=( 0.25 0.50 0.75 )
-betas=( 0.50 )
-horizons=( 4 )
+alphas=( 0.00 )
+betas=( 0.00 )
+horizons=( 1 )
 
 for (( i=0; i<${repeat}; i++ ))
 do
