@@ -391,7 +391,6 @@ class DDAEnv(gym.Env):
             self.elapsed_scans_since_last_ms1, 100)
 
         if self.use_dew:
-
             # count excluded and not-excluded
             excluded = state['excluded']
             excluded_count = np.count_nonzero(excluded[:num_features] > 0)
@@ -643,51 +642,30 @@ class DDAEnv(gym.Env):
 
     def _compute_ms2_reward(self, chem, chem_frag_int, frag_time):
 
-        # coverage reward
-        if chem not in self.frag_chem_intensity:
-            chem_last_frag_int = 0.0
-            coverage_reward = 1.0
-        else:
-            chem_last_frag_int = self.frag_chem_intensity[chem]
-            coverage_reward = 0.0
+        # Apex reward
+        rel_frag_time = frag_time - chem.rt
+        chrom = chem.chromatogram
+        apex_reward = self._compute_apex_reward(chrom, rel_frag_time)
 
         # intensity reward
         log_chem_frag_int = np.log(chem_frag_int)
         normalized_log_intensity = log_chem_frag_int / MAX_OBSERVED_LOG_INTENSITY
         intensity_reward = np.clip(normalized_log_intensity, 0, 1)
 
-        # --- apex reward calculation starts here ---
-        chrom = chem.chromatogram
-        rel_frag_time = frag_time - chem.rt
-
-        # # Calculate the previous and current normalized fragmentation times
-        #
-        # normalized_frag_time = (rel_frag_time - min_rt) / (max_rt - min_rt)
-        # normalized_apex_time = (apex_time - min_rt) / (max_rt - min_rt)
-        # apex_distance = abs(normalized_frag_time - normalized_apex_time)
-        #
-        # if chem in self.frag_chem_time:
-        #     rel_last_frag_time = self.frag_chem_time[chem] - chem.rt
-        #     normalized_last_frag_time = (rel_last_frag_time - min_rt) / (max_rt - min_rt)
-        #     last_apex_distance = abs(normalized_last_frag_time - normalized_apex_time)
-        #     apex_distance_improvement = max(0, last_apex_distance - apex_distance)
-        # else:
-        #     apex_distance_improvement = apex_distance
-        #
-        # apex_reward = 1 - apex_distance_improvement
-        # assert 0 <= apex_reward <= 1
-
-        apex_reward = self._compute_apex_reward(chrom, rel_frag_time)
+        # Penalty for excessive fragmentation
+        penalty = 0
         if chem in self.frag_chem_time:
             rel_last_frag_time = self.frag_chem_time[chem] - chem.rt
             last_apex_reward = self._compute_apex_reward(chrom, rel_last_frag_time)
-            apex_reward = max(0, apex_reward - last_apex_reward)
+            apex_reward_diff = apex_reward - last_apex_reward
 
-        # print(apex_reward)
-        assert 0 <= apex_reward <= 1
+            # When apex_reward improves upon the previous one, i.e. apex_reward_diff is positive,
+            # the penalty is 0. Otherwise if apex_reward_diff is negative, then the penalty is
+            # -apex_reward_diff, which is positive.
+            penalty = max(0, -apex_reward_diff)
 
-        reward = (self.alpha * coverage_reward) + (self.beta * intensity_reward) + \
-                 ((1 - self.alpha - self.beta) * apex_reward)
+        # combined reward
+        reward = apex_reward * intensity_reward * (1 - penalty)
         return reward
 
     def _compute_apex_reward(self, chrom, rel_frag_time):
