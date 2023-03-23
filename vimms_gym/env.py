@@ -572,18 +572,17 @@ class DDAEnv(gym.Env):
                     # TODO: assume only 1 chemical has been fragmented
                     # works for DDA but not for DIA
                     frag_event = frag_events[0]
-                    chem_frag_int = frag_event.parents_intensity[0]
+                    frag_int = frag_event.parents_intensity[0]
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
 
                     # compute ms2 reward
-                    reward = self._compute_ms2_reward(chem, chem_frag_int, frag_event.query_rt)
+                    reward = self._compute_ms2_reward(chem, frag_int, frag_event.query_rt)
 
                     # store new intensity and frag time into dictionaries
-                    self.frag_chem_intensity[chem] = chem_frag_int
+                    self.frag_chem_intensity[chem] = frag_int
                     self.frag_chem_time[chem] = frag_event.query_rt
-
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
@@ -640,7 +639,7 @@ class DDAEnv(gym.Env):
         reward = 1 - np.exp(-alpha * x)
         return reward
 
-    def _compute_ms2_reward(self, chem, chem_frag_int, frag_time):
+    def _compute_ms2_reward(self, chem, frag_int, frag_time):
 
         # Apex reward
         rel_frag_time = frag_time - chem.rt
@@ -648,7 +647,7 @@ class DDAEnv(gym.Env):
         apex_reward = self._compute_apex_reward(chrom, rel_frag_time)
 
         # intensity reward
-        log_chem_frag_int = np.log(chem_frag_int)
+        log_chem_frag_int = np.log(frag_int)
         normalized_log_intensity = log_chem_frag_int / MAX_OBSERVED_LOG_INTENSITY
         intensity_reward = np.clip(normalized_log_intensity, 0, 1)
 
