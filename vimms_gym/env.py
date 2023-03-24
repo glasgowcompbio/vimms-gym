@@ -38,6 +38,9 @@ class DDAEnv(gym.Env):
         self.chemical_creator_params = params['chemical_creator']
         self.noise_params = params['noise']
         self.env_params = params['env']
+        self.min_rt = self.env_params['rt_range'][0]
+        self.max_rt = self.env_params['rt_range'][1]
+
         self.alpha = ALPHA if 'alpha' not in self.env_params else self.env_params['alpha']
         self.beta = BETA if 'beta' not in self.env_params else self.env_params['beta']
 
@@ -121,8 +124,8 @@ class DDAEnv(gym.Env):
             'unfragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
             'excluded_count': spaces.Box(low=0, high=1, shape=(1,)),
             'unexcluded_count': spaces.Box(low=0, high=1, shape=(1,)),
-            'elapsed_scans_since_start': spaces.Box(low=0, high=1, shape=(1,)),
-            'elapsed_scans_since_last_ms1': spaces.Box(low=0, high=1, shape=(1,)),
+            'remaining_time': spaces.Box(low=0, high=1, shape=(1,)),
+            'num_fragmented': spaces.Box(low=0, high=1, shape=(1,)),
         }
 
         if not self.use_dew:
@@ -177,8 +180,8 @@ class DDAEnv(gym.Env):
             'unfragmented_count': np.zeros(1, dtype=np.float32),
             'excluded_count': np.zeros(1, dtype=np.float32),
             'unexcluded_count': np.zeros(1, dtype=np.float32),
-            'elapsed_scans_since_start': np.zeros(1, dtype=np.float32),
-            'elapsed_scans_since_last_ms1': np.zeros(1, dtype=np.float32)
+            'remaining_time': np.zeros(1, dtype=np.float32),
+            'num_fragmented': np.zeros(1, dtype=np.float32)
         }
 
         if not self.use_dew:
@@ -199,7 +202,9 @@ class DDAEnv(gym.Env):
     def _scan_to_state(self, dda_action, scan_to_process):
         # TODO: can be moved into its own class?
 
-        self.elapsed_scans_since_start += 1
+        current_time = scan_to_process.rt
+        self.remaining_time = self.max_rt - current_time
+
         if dda_action.ms_level == 1:
             state = self._scan_to_state_ms1(scan_to_process)
 
@@ -319,7 +324,7 @@ class DDAEnv(gym.Env):
             state['roi_intensities_9'], num_features, MAX_OBSERVED_LOG_INTENSITY)
 
         state['ms_level'] = 0
-        self.elapsed_scans_since_last_ms1 = 0
+        self.num_fragmented = 0
         return state
 
     def _scan_to_state_ms2(self, dda_action, scan_to_process):
@@ -363,7 +368,7 @@ class DDAEnv(gym.Env):
                 state['excluded'][i] = excluded
                 f.excluded = excluded
         state['ms_level'] = 1
-        self.elapsed_scans_since_last_ms1 += 1
+        self.num_fragmented += 1
         return state
 
     def _get_excluded(self, mz, current_rt):
@@ -385,10 +390,10 @@ class DDAEnv(gym.Env):
         state['unfragmented_count'][0] = clip_value(unfragmented_count, num_features)
         assert (fragmented_count + unfragmented_count) == num_features
 
-        state['elapsed_scans_since_start'][0] = clip_value(
-            self.elapsed_scans_since_start, 10000)
-        state['elapsed_scans_since_last_ms1'][0] = clip_value(
-            self.elapsed_scans_since_last_ms1, 100)
+        state['remaining_time'][0] = clip_value(
+            self.remaining_time, self.max_rt - self.min_rt)
+        state['num_fragmented'][0] = clip_value(
+            self.num_fragmented, num_features)
 
         if self.use_dew:
             # count excluded and not-excluded
@@ -422,11 +427,10 @@ class DDAEnv(gym.Env):
         self.last_action = None
 
         self.elapsed_scans_since_start = 0
-        self.elapsed_scans_since_last_ms1 = 0
+        self.num_fragmented = 0
         self.ms1_count = 0
         self.ms2_count = 0
         self.invalid_action_count = 0
-        self.num_fragmented = 0
 
         # track regions of interest
         smartroi_params = SmartRoiParams()
@@ -547,10 +551,6 @@ class DDAEnv(gym.Env):
 
     @abstractmethod
     def _compute_reward(self, next_scan, dda_action, is_valid):
-        """
-        Give a constant reward for MS1 scan
-        Compute MS2 reward by summing the total fragmented precursor intensities.
-        """
         frag_events = next_scan.fragevent
         reward = 0
 
@@ -562,9 +562,8 @@ class DDAEnv(gym.Env):
 
             if dda_action.ms_level == 1:
                 # compute ms1 reward
-                num_fragmented = self.elapsed_scans_since_last_ms1
                 num_total = len(self.features)
-                reward = self._compute_ms1_reward(num_fragmented, num_total, MS1_REWARD_SHAPE)
+                reward = self._compute_ms1_reward(self.num_fragmented, num_total, MS1_REWARD_SHAPE)
 
             elif dda_action.ms_level == 2:
                 if frag_events is not None:  # some chemical has been fragmented
@@ -749,9 +748,8 @@ class DDAEnv(gym.Env):
         """
         Generates new ViMMS environment to run controller and mass spec together
         """
-        min_rt = env_params['rt_range'][0]
-        max_rt = env_params['rt_range'][1]
-        vimms_env = Environment(mass_spec, controller, min_rt, max_rt, progress_bar=False)
+        vimms_env = Environment(mass_spec, controller, self.min_rt, self.max_rt,
+                                progress_bar=False)
         return vimms_env
 
     def _handle_acquisition_open(self):
