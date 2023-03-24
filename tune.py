@@ -115,9 +115,9 @@ def sample_ppo_params(trial, tune_model, tune_reward):
         # when not working with images
         net_arch = trial.suggest_categorical('net_arch', ['small', 'medium', 'large'])
         net_arch = {
-            'small': [dict(pi=[64, 64], vf=[64, 64])],
-            'medium': [dict(pi=[256, 256], vf=[256, 256])],
-            'large': [dict(pi=[512, 512], vf=[512, 512])],
+            'small': dict(pi=[64, 64], vf=[64, 64]),
+            'medium': dict(pi=[256, 256], vf=[256, 256]),
+            'large': dict(pi=[512, 512], vf=[512, 512]),
         }[net_arch]
 
         activation_fn = \

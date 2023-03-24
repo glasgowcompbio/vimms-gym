@@ -182,9 +182,9 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
             activation_fn]
 
         net_arch = {
-            'small': [dict(pi=[64, 64], vf=[64, 64])],
-            'medium': [dict(pi=[256, 256], vf=[256, 256])],
-            'large': [dict(pi=[512, 512], vf=[512, 512])],
+            'small': dict(pi=[64, 64], vf=[64, 64]),
+            'medium': dict(pi=[256, 256], vf=[256, 256]),
+            'large': dict(pi=[512, 512], vf=[512, 512]),
         }[net_arch]
 
         params['model'] = {
