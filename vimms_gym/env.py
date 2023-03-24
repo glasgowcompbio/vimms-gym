@@ -551,6 +551,18 @@ class DDAEnv(gym.Env):
 
     @abstractmethod
     def _compute_reward(self, next_scan, dda_action, is_valid):
+        """
+        Compute the reward for a given action.
+
+        Args:
+            next_scan: The next scan in the environment.
+            dda_action: The action taken by the agent.
+            is_valid: A boolean indicating whether the action is valid or not.
+
+        Returns:
+            float: The reward for the action, in the range [-1, 1].
+        """
+
         frag_events = next_scan.fragevent
         reward = 0
 
@@ -592,53 +604,39 @@ class DDAEnv(gym.Env):
 
     def _compute_ms1_reward(self, num_fragmented, num_total, alpha):
         """
-        Calculate the MS1 reward as a function of the number of precursor ions
-        that have been fragmented, using a decreasing exponential function that
-        assigns more weight to the early precursor ions and gradually decreases
-        the weight for the later ones.
+        Calculate the MS1 reward based on the number of precursor ions that have
+        been fragmented, using a decreasing exponential function. The reward
+        assigns more weight to early fragmented ions and gradually decreases the
+        weight for later ones.
 
         Args:
-            num_fragmented (int): The number of precursor ions that have been
-                fragmented so far. This should be a non-negative integer less than
-                or equal to num_total.
-            num_total (int): The total number of precursor ions in the current
-                scan. This should be a positive integer.
-            alpha (float): A scaling parameter that controls the shape of the
-                reward function. A larger alpha value will result in a steeper
-                curve that assigns more weight to the early precursor ions, while
-                a smaller alpha value will result in a flatter curve that assigns
-                more equal weight to all precursor ions. This should be a positive
-                float.
+            num_fragmented (int): The number of fragmented precursor ions.
+            num_total (int): The total number of precursor ions in the scan.
+            alpha (float): A scaling parameter controlling the reward function shape.
 
         Returns:
-            float: The MS1 reward for selecting an MS1 scan action, a value between
-            0 and 1. The reward is based on the fraction of precursor ions that have
-            been fragmented so far, using a decreasing exponential function that
-            assigns more weight to the early precursor ions and gradually decreases
-            the weight for the later ones.
-
-        The MS1 reward function implemented here is based on the formula:
-
-            reward = 1 - exp(-alpha * x)
-
-        where x is the fraction of precursor ions that have been fragmented so far,
-        calculated as num_fragmented / num_total. This formula corresponds to a
-        decreasing exponential function that assigns more weight to the early
-        precursor ions and gradually decreases the weight for the later ones.
-
-        If alpha is set to 0, the MS1 reward will be a linear function of the number
-        of precursor ions that have been fragmented, like the original reward
-        function. If alpha is set to infinity, the MS1 reward will be 1 if no
-        precursor ions have been fragmented and 0 if all precursor ions have been
-        fragmented, effectively preventing the selection of MS1 scan actions
-        altogether. A reasonable range for alpha depends on the specific application
-        and can be determined through experimentation or domain expertise.
+            float: The MS1 reward in the range [0, 1].
         """
+
         x = num_fragmented / num_total
         reward = 1 - np.exp(-alpha * x)
         return reward
 
     def _compute_ms2_reward(self, chem, frag_int, frag_time):
+        """
+        Compute the MS2 reward for a given chemical, fragmentation intensity, and fragmentation time.
+        The MS2 reward consists of three components: apex reward, intensity reward, and penalty for
+        excessive fragmentation. The final reward is the product of the apex reward, intensity
+        reward, and (1 - penalty).
+
+        Args:
+            chem: The chemical being fragmented.
+            frag_int: The fragmentation intensity.
+            frag_time: The fragmentation time.
+
+        Returns:
+            float: The MS2 reward, in the range [0, 1].
+        """
 
         # Apex reward
         rel_frag_time = frag_time - chem.rt
@@ -667,6 +665,19 @@ class DDAEnv(gym.Env):
         return reward
 
     def _compute_apex_reward(self, chrom, rel_frag_time):
+        """
+        Compute the apex reward for a given chromatogram and relative fragmentation time.
+        The apex reward is based on the distance between the relative fragmentation time and the
+        apex time of the chromatogram, normalized by the chromatogram's retention time range.
+        The closer the relative fragmentation time is to the apex time, the higher the reward.
+
+        Args:
+            chrom: The chromatogram of the chemical.
+            rel_frag_time: The relative fragmentation time.
+
+        Returns:
+            float: The apex reward, in the range [0, 1].
+        """
         min_rt = chrom.min_rt
         max_rt = chrom.max_rt
         apex_time = chrom.get_apex_rt()
