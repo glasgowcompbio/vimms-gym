@@ -121,20 +121,20 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
     if model_name == METHOD_DQN:
 
         # best reward with 1E6 timesteps
-        # alpha   = 0.25
-        # beta    = 0.50
-        # horizon = 4
-        gamma = 0.95
-        learning_rate = 0.00014450137513290646
-        batch_size = 256
-        buffer_size = 10000
-        train_freq = 1
-        subsample_steps = 2
+        # alpha   = 0.00
+        # beta    = 0.00
+        # horizon = 1
+        gamma = 0.9
+        learning_rate = 0.000783473
+        batch_size = 32
+        buffer_size = 50000
+        train_freq = 4
+        subsample_steps = 1
         gradient_steps = max(train_freq // subsample_steps, 1)
-        exploration_fraction = 0.27797033409246663
-        exploration_final_eps = 0.005589071654866951
+        exploration_fraction = 0.200663982
+        exploration_final_eps = 0.198115936
         target_update_interval = 20000
-        learning_starts = 2000
+        learning_starts = 20000
         hidden_nodes = 256
         policy_kwargs = dict(net_arch=[hidden_nodes, hidden_nodes])
         params['model'] = {
