@@ -76,7 +76,7 @@ def sample_ppo_params(trial, tune_model, tune_reward):
     params = {}
 
     if tune_model:
-        batch_size = trial.suggest_categorical('batch_size', [8, 16, 32, 64, 128, 256, 512])
+        batch_size = trial.suggest_categorical('batch_size', [32, 64, 128, 256, 512])
         n_steps = trial.suggest_categorical('n_steps', [128, 256, 512, 1024, 2048])
         gamma = trial.suggest_categorical('gamma', [0.9, 0.95, 0.98, 0.99, 0.995, 0.999, 0.9999])
         learning_rate = trial.suggest_float('learning_rate', 1e-5, 1, log=True)
