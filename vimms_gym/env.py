@@ -59,6 +59,7 @@ class DDAEnv(gym.Env):
 
         self.action_space = self._get_action_space()
         self.observation_space = self._get_observation_space()
+        self.valid_actions = np.zeros(self.in_dim)
 
         self.mass_spec = None
         self.controller = None
@@ -107,25 +108,12 @@ class DDAEnv(gym.Env):
             'roi_intensities_9': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
             'avg_roi_intensities': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
 
-            'roi_intensity_diff_1': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
-            'roi_intensity_diff_2': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
-            'roi_intensity_diff_3': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
-            'roi_intensity_diff_4': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
-            'roi_intensity_diff_5': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
-            'roi_intensity_diff_6': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
-            'roi_intensity_diff_7': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
-            'roi_intensity_diff_8': spaces.Box(low=-1, high=1, shape=(self.max_peaks,)),
-
             # valid action indicators, last action and current ms level
-            'valid_actions': spaces.MultiBinary(self.in_dim),
             'last_action': spaces.Discrete(self.in_dim + 1),
             'ms_level': spaces.Discrete(2),  # either MS1 or MS2 scans
 
             # various other counts
-            'fragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
-            'unfragmented_count': spaces.Box(low=0, high=1, shape=(1,)),
             'excluded_count': spaces.Box(low=0, high=1, shape=(1,)),
-            'unexcluded_count': spaces.Box(low=0, high=1, shape=(1,)),
             'remaining_time': spaces.Box(low=0, high=1, shape=(1,)),
             'num_fragmented': spaces.Box(low=0, high=1, shape=(1,)),
         }
@@ -133,7 +121,6 @@ class DDAEnv(gym.Env):
         if not self.use_dew:
             del spaces_dict['excluded']
             del spaces_dict['excluded_count']
-            del spaces_dict['unexcluded_count']
 
         combined_spaces = spaces.Dict(spaces_dict)
         return combined_spaces
@@ -163,25 +150,12 @@ class DDAEnv(gym.Env):
             'roi_intensities_9': np.zeros(self.max_peaks, dtype=np.float32),
             'avg_roi_intensities': np.zeros(self.max_peaks, dtype=np.float32),
 
-            'roi_intensity_diff_1': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensity_diff_2': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensity_diff_3': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensity_diff_4': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensity_diff_5': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensity_diff_6': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensity_diff_7': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensity_diff_8': np.zeros(self.max_peaks, dtype=np.float32),
-
             # valid action indicators
-            'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
             'ms_level': 0,
             'last_action': 0,
 
             # various other counts
-            'fragmented_count': np.zeros(1, dtype=np.float32),
-            'unfragmented_count': np.zeros(1, dtype=np.float32),
             'excluded_count': np.zeros(1, dtype=np.float32),
-            'unexcluded_count': np.zeros(1, dtype=np.float32),
             'remaining_time': np.zeros(1, dtype=np.float32),
             'num_fragmented': np.zeros(1, dtype=np.float32)
         }
@@ -189,7 +163,6 @@ class DDAEnv(gym.Env):
         if not self.use_dew:
             del features['excluded']
             del features['excluded_count']
-            del features['unexcluded_count']
 
         return features
 
@@ -213,7 +186,7 @@ class DDAEnv(gym.Env):
         elif dda_action.ms_level == 2:
             state = self._scan_to_state_ms2(dda_action, scan_to_process)
 
-        state['valid_actions'][-1] = 1  # ms1 action is always valid
+        self.valid_actions[-1] = 1 # ms1 action is always valid
         state['last_action'] = self.last_action
         return state
 
@@ -274,9 +247,9 @@ class DDAEnv(gym.Env):
             state['fragmented'][i] = 0 if not f.fragmented else 1
             if self.use_dew:
                 state['excluded'][i] = 0 if not f.excluded else 1
-            state['valid_actions'][i] = 1  # fragmentable
+            self.valid_actions[i] = 1  # fragmentable
             if f.original_intensity < self.min_ms1_intensity:
-                state['valid_actions'][i] = 0  # except when it's below min ms1 intensity
+                self.valid_actions[i] = 0 # except when it's below min ms1 intensity
             update_feature_roi(f, i, state)  # update ROI information for this feature
 
         state['roi_intensity_at_last_frag'] = scale_intensities(
@@ -288,23 +261,6 @@ class DDAEnv(gym.Env):
 
         state['avg_roi_intensities'] = scale_intensities(
             state['avg_roi_intensities'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-
-        state['roi_intensity_diff_1'] = scale_intensities(
-            state['roi_intensity_diff_1'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_intensity_diff_2'] = scale_intensities(
-            state['roi_intensity_diff_2'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_intensity_diff_3'] = scale_intensities(
-            state['roi_intensity_diff_3'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_intensity_diff_4'] = scale_intensities(
-            state['roi_intensity_diff_4'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_intensity_diff_5'] = scale_intensities(
-            state['roi_intensity_diff_5'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_intensity_diff_6'] = scale_intensities(
-            state['roi_intensity_diff_6'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_intensity_diff_7'] = scale_intensities(
-            state['roi_intensity_diff_7'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_intensity_diff_8'] = scale_intensities(
-            state['roi_intensity_diff_8'], num_features, MAX_OBSERVED_LOG_INTENSITY)
 
         state['intensities'] = scale_intensities(
             state['intensities'], num_features, MAX_OBSERVED_LOG_INTENSITY)
@@ -343,7 +299,7 @@ class DDAEnv(gym.Env):
         state['fragmented'][idx] = 1
 
         # it's no longer valid to fragment this peak again
-        state['valid_actions'][idx] = 0
+        self.valid_actions[idx] = 0
 
         # find the feature that has been fragmented in this MS2 scan
         current_rt = scan_to_process.rt
@@ -390,15 +346,6 @@ class DDAEnv(gym.Env):
         fragmented = state['fragmented']
 
         # count fragmented
-        fragmented_count = np.count_nonzero(fragmented[:num_features] > 0)
-
-        # count unfragmented
-        unfragmented_count = np.count_nonzero(fragmented[:num_features] == 0)
-
-        state['fragmented_count'][0] = clip_value(fragmented_count, num_features)
-        state['unfragmented_count'][0] = clip_value(unfragmented_count, num_features)
-        assert (fragmented_count + unfragmented_count) == num_features
-
         state['remaining_time'][0] = clip_value(
             self.remaining_time, self.max_rt - self.min_rt)
         state['num_fragmented'][0] = clip_value(
@@ -408,11 +355,7 @@ class DDAEnv(gym.Env):
             # count excluded and not-excluded
             excluded = state['excluded']
             excluded_count = np.count_nonzero(excluded[:num_features] > 0)
-            unexcluded_count = np.count_nonzero(excluded[:num_features] == 0)
-
             state['excluded_count'][0] = clip_value(excluded_count, num_features)
-            state['unexcluded_count'][0] = clip_value(unexcluded_count, num_features)
-            assert (excluded_count + unexcluded_count) == num_features
 
     def _initial_values(self):
         """
@@ -495,7 +438,7 @@ class DDAEnv(gym.Env):
         return self.state, self.last_reward, self.episode_done, info
 
     def action_masks(self):
-        mask = self.state['valid_actions'].astype(bool)
+        mask = self.valid_actions.astype(bool)
         return mask
 
     def _one_step(self, action, scan_to_process):

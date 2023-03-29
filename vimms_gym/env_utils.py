@@ -47,15 +47,6 @@ def update_feature_roi(feature, i, state):
     roi_intensities_9 = 0.0
     avg_intensity = 0.0
 
-    roi_intensity_diff_1 = 0.0
-    roi_intensity_diff_2 = 0.0
-    roi_intensity_diff_3 = 0.0
-    roi_intensity_diff_4 = 0.0
-    roi_intensity_diff_5 = 0.0
-    roi_intensity_diff_6 = 0.0
-    roi_intensity_diff_7 = 0.0
-    roi_intensity_diff_8 = 0.0
-
     # current length of this ROI (in seconds)
     try:
         roi_length = clip_value(roi.length_in_seconds, MAX_ROI_LENGTH_SECONDS)
@@ -92,49 +83,41 @@ def update_feature_roi(feature, i, state):
         avg_intensity = np.mean(intensities)
         try:
             roi_intensities_2 = intensities[-2]
-            roi_intensity_diff_1 = intensities[-1] - intensities[-2]
         except IndexError:
             pass
 
         try:
             roi_intensities_3 = intensities[-3]
-            roi_intensity_diff_2 = intensities[-2] - intensities[-3]
         except IndexError:
             pass
 
         try:
             roi_intensities_4 = intensities[-4]
-            roi_intensity_diff_3 = intensities[-3] - intensities[-4]
         except IndexError:
             pass
 
         try:
             roi_intensities_5 = intensities[-5]
-            roi_intensity_diff_4 = intensities[-4] - intensities[-5]
         except IndexError:
             pass
 
         try:
             roi_intensities_6 = intensities[-6]
-            roi_intensity_diff_5 = intensities[-5] - intensities[-6]
         except IndexError:
             pass
 
         try:
             roi_intensities_7 = intensities[-7]
-            roi_intensity_diff_6 = intensities[-6] - intensities[-7]
         except IndexError:
             pass
 
         try:
             roi_intensities_8 = intensities[-8]
-            roi_intensity_diff_7 = intensities[-7] - intensities[-8]
         except IndexError:
             pass
 
         try:
             roi_intensities_9 = intensities[-9]
-            roi_intensity_diff_8 = intensities[-8] - intensities[-9]
         except IndexError:
             pass
 
@@ -152,15 +135,6 @@ def update_feature_roi(feature, i, state):
     state['roi_intensities_7'][i] = roi_intensities_7
     state['roi_intensities_8'][i] = roi_intensities_8
     state['roi_intensities_9'][i] = roi_intensities_9
-
-    state['roi_intensity_diff_1'][i] = roi_intensity_diff_1
-    state['roi_intensity_diff_2'][i] = roi_intensity_diff_2
-    state['roi_intensity_diff_3'][i] = roi_intensity_diff_3
-    state['roi_intensity_diff_4'][i] = roi_intensity_diff_4
-    state['roi_intensity_diff_5'][i] = roi_intensity_diff_5
-    state['roi_intensity_diff_6'][i] = roi_intensity_diff_6
-    state['roi_intensity_diff_7'][i] = roi_intensity_diff_7
-    state['roi_intensity_diff_8'][i] = roi_intensity_diff_8
 
     state['avg_roi_intensities'][i] = avg_intensity
 
