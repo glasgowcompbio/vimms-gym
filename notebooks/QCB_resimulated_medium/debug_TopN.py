@@ -31,7 +31,7 @@ methods = [
     METHOD_TOPN,
 ]
 valid_random = True
-n_eval_episodes = 1
+n_eval_episodes = 5
 
 # topN parameters
 topN_N = 10
@@ -83,49 +83,49 @@ for method in methods:
 
 #### Test classic controllers in ViMMS
 
-enable_spike_noise = params['noise']['enable_spike_noise']
-ionisation_mode = params['env']['ionisation_mode']
-isolation_window = params['env']['isolation_window']
-mz_tol = params['env']['mz_tol']
-rt_range = params['chemical_creator']['rt_range']
-method = 'TopN_Controller'
-print('method = %s' % method)
-print()
+# enable_spike_noise = params['noise']['enable_spike_noise']
+# ionisation_mode = params['env']['ionisation_mode']
+# isolation_window = params['env']['isolation_window']
+# mz_tol = params['env']['mz_tol']
+# rt_range = params['chemical_creator']['rt_range']
+# method = 'TopN_Controller'
+# print('method = %s' % method)
+# print()
 
-effective_rt_tol = topN_rt_tol
-effective_N = topN_N
-eval_results = []
-for i in range(len(chem_list)):
-
-    spike_noise = None
-    if enable_spike_noise:
-        noise_params = params['noise']
-        noise_density = noise_params['noise_density']
-        noise_max_val = noise_params['noise_max_val']
-        noise_min_mz = noise_params['mz_range'][0]
-        noise_max_mz = noise_params['mz_range'][1]
-        spike_noise = UniformSpikeNoise(noise_density, noise_max_val, min_mz=noise_min_mz,
-                                        max_mz=noise_max_mz)
-
-    # print(effective_N, mz_tol, effective_rt_tol, min_ms1_intensity)
-    chems = chem_list[i]
-    mass_spec = IndependentMassSpectrometer(ionisation_mode, chems, spike_noise=spike_noise)
-    controller = TopNController(ionisation_mode, effective_N, isolation_window, mz_tol,
-                                effective_rt_tol,
-                                min_ms1_intensity)
-    env = Environment(mass_spec, controller, rt_range[0], rt_range[1], progress_bar=False,
-                      out_dir=out_dir,
-                      out_file='%s_%d.mzML' % (method, i), save_eval=True)
-    env.run()
-
-    eval_res = evaluate(env, intensity_threshold)
-    # eval_res['total_rewards'] = 0
-    eval_results.append(eval_res)
-    print('Episode %d finished' % i)
-    print(eval_res)
-    print()
-
-method_eval_results[method] = eval_results
+# effective_rt_tol = topN_rt_tol
+# effective_N = topN_N
+# eval_results = []
+# for i in range(len(chem_list)):
+#
+#     spike_noise = None
+#     if enable_spike_noise:
+#         noise_params = params['noise']
+#         noise_density = noise_params['noise_density']
+#         noise_max_val = noise_params['noise_max_val']
+#         noise_min_mz = noise_params['mz_range'][0]
+#         noise_max_mz = noise_params['mz_range'][1]
+#         spike_noise = UniformSpikeNoise(noise_density, noise_max_val, min_mz=noise_min_mz,
+#                                         max_mz=noise_max_mz)
+#
+#     # print(effective_N, mz_tol, effective_rt_tol, min_ms1_intensity)
+#     chems = chem_list[i]
+#     mass_spec = IndependentMassSpectrometer(ionisation_mode, chems, spike_noise=spike_noise)
+#     controller = TopNController(ionisation_mode, effective_N, isolation_window, mz_tol,
+#                                 effective_rt_tol,
+#                                 min_ms1_intensity)
+#     env = Environment(mass_spec, controller, rt_range[0], rt_range[1], progress_bar=False,
+#                       out_dir=out_dir,
+#                       out_file='%s_%d.mzML' % (method, i), save_eval=True)
+#     env.run()
+#
+#     eval_res = evaluate(env, intensity_threshold)
+#     # eval_res['total_rewards'] = 0
+#     eval_results.append(eval_res)
+#     print('Episode %d finished' % i)
+#     print(eval_res)
+#     print()
+#
+# method_eval_results[method] = eval_results
 
 data = []
 for method in method_eval_results:
@@ -161,4 +161,4 @@ df = pd.DataFrame(data, columns=['method', 'total_rewards', 'invalid_action_coun
 
 # set the display option to show all columns
 pd.set_option('display.max_columns', None)
-print(df)
+print(df.groupby('method').describe())
