@@ -637,7 +637,7 @@ class DDAEnv(gym.Env):
 
     def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, frag_time):
 
-        intensity_reward = self._compute_intensity_gain_reward(chem, chem_frag_int)
+        # intensity_reward = self._compute_intensity_gain_reward(chem, chem_frag_int)
 
         rel_frag_time = frag_time - chem.rt
         chrom = chem.chromatogram
@@ -647,8 +647,7 @@ class DDAEnv(gym.Env):
             last_apex_reward = self._compute_apex_reward(chrom, rel_last_frag_time)
             apex_reward = max(0, apex_reward - last_apex_reward)
 
-        alpha = 0.0  # You can experiment with different values to find the best balance
-        reward = alpha * intensity_reward + (1 - alpha) * apex_reward
+        reward = apex_reward
 
         # print(apex_reward)
         assert 0 <= reward <= 1
