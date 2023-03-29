@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from collections import defaultdict
 from copy import deepcopy
 
 import gym
@@ -18,8 +19,9 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, RENDER_HUMAN, RENDER_RGB_ARRAY, \
     render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, CLIPPED_INTENSITY_LOW, \
-    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA
-from vimms_gym.env_utils import scale_intensities, update_feature_roi
+    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA, \
+    PENALTY_SCALE
+from vimms_gym.env_utils import scale_intensities, update_feature_roi, shifted_sigmoid
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -450,6 +452,7 @@ class DDAEnv(gym.Env):
         # track fragmented chemicals
         self.frag_chem_intensity = {}
         self.frag_chem_time = {}
+        self.frag_chem_count = defaultdict(int)
 
         # needed for SubprocVecEnv
         set_log_level_warning()
@@ -590,17 +593,20 @@ class DDAEnv(gym.Env):
                     # TODO: assume only 1 chemical has been fragmented
                     # works for DDA but not for DIA
                     frag_event = frag_events[0]
-                    frag_int = frag_event.parents_intensity[0]
+                    chem_frag_int = frag_event.parents_intensity[0]
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
+                    chem_frag_count = self.frag_chem_count[chem]
 
                     # compute ms2 reward
-                    reward = self._compute_ms2_reward(chem, frag_int, frag_event.query_rt)
+                    reward = self._compute_ms2_reward(chem, chem_frag_int, chem_frag_count,
+                                                      frag_event.query_rt)
 
                     # store new intensity and frag time into dictionaries
-                    self.frag_chem_intensity[chem] = frag_int
+                    self.frag_chem_intensity[chem] = chem_frag_int
                     self.frag_chem_time[chem] = frag_event.query_rt
+                    self.frag_chem_count[chem] += 1
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
@@ -629,49 +635,38 @@ class DDAEnv(gym.Env):
         reward = 1 - np.exp(-alpha * x)
         return reward
 
-    def _compute_ms2_reward(self, chem, frag_int, frag_time):
-        """
-        Compute the MS2 reward for a given chemical, fragmentation intensity, and fragmentation time.
-        The MS2 reward consists of three components: apex reward, intensity reward, and penalty for
-        excessive fragmentation. The final reward is the product of the apex reward, intensity
-        reward, and (1 - penalty).
+    def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, frag_time):
 
-        Args:
-            chem: The chemical being fragmented.
-            frag_int: The fragmentation intensity.
-            frag_time: The fragmentation time.
+        intensity_reward = self._compute_intensity_gain_reward(chem, chem_frag_int)
 
-        Returns:
-            float: The MS2 reward, in the range [0, 1].
-        """
-
-        # Apex reward
         rel_frag_time = frag_time - chem.rt
         chrom = chem.chromatogram
         apex_reward = self._compute_apex_reward(chrom, rel_frag_time)
-
-        # intensity reward
-        log_chem_frag_int = np.log(frag_int)
-        normalized_log_intensity = log_chem_frag_int / MAX_OBSERVED_LOG_INTENSITY
-        intensity_reward = np.clip(normalized_log_intensity, 0, 1)
-
-        # Penalty for excessive fragmentation
-        penalty = 0
         if chem in self.frag_chem_time:
             rel_last_frag_time = self.frag_chem_time[chem] - chem.rt
             last_apex_reward = self._compute_apex_reward(chrom, rel_last_frag_time)
-            apex_reward_diff = apex_reward - last_apex_reward
+            apex_reward = max(0, apex_reward - last_apex_reward)
 
-            # When apex_reward improves upon the previous one, i.e. apex_reward_diff is positive,
-            # the penalty is 0. Otherwise if apex_reward_diff is negative, then the penalty is
-            # -apex_reward_diff, which is positive.
-            penalty = max(0, -apex_reward_diff)
+        alpha = 0.0  # You can experiment with different values to find the best balance
+        reward = alpha * intensity_reward + (1 - alpha) * apex_reward
 
-        # combined reward
-        reward = apex_reward * intensity_reward * (1 - penalty)
+        # print(apex_reward)
+        assert 0 <= reward <= 1
+
         return reward
 
-    def _compute_apex_reward(self, chrom, rel_frag_time):
+    def _compute_intensity_gain_reward(self, chem, chem_frag_int):
+        if chem not in self.frag_chem_intensity:
+            # First fragmentation of this ion, maximum information gain
+            return 1.0
+
+        log_chem_frag_int = np.log(chem_frag_int)
+        log_last_frag_int = np.log(self.frag_chem_intensity[chem])
+        intensity_difference = abs(log_chem_frag_int - log_last_frag_int)
+        intensity_gain = intensity_difference / max(log_chem_frag_int, log_last_frag_int)
+        return np.clip(intensity_gain, 0, 1)
+
+    def _compute_apex_reward(self, chrom, rel_frag_time, scaling_factor=10.0):
         """
         Compute the apex reward for a given chromatogram and relative fragmentation time.
         The apex reward is based on the distance between the relative fragmentation time and the
@@ -681,6 +676,7 @@ class DDAEnv(gym.Env):
         Args:
             chrom: The chromatogram of the chemical.
             rel_frag_time: The relative fragmentation time.
+            scaling_factor: A positive scaling factor controlling the penalty for suboptimal fragmentation times.
 
         Returns:
             float: The apex reward, in the range [0, 1].
@@ -690,9 +686,16 @@ class DDAEnv(gym.Env):
         apex_time = chrom.get_apex_rt()
         normalized_frag_time = (rel_frag_time - min_rt) / (max_rt - min_rt)
         normalized_apex_time = (apex_time - min_rt) / (max_rt - min_rt)
-        apex_distance = abs(normalized_frag_time - normalized_apex_time)
-        apex_reward = 1 - apex_distance
+        apex_reward = self.apex_reward(normalized_frag_time, normalized_apex_time,
+                                       scaling_factor)
         return apex_reward
+
+    def apex_reward(self, frag_time, apex_time, scaling_factor):
+        distance = abs(frag_time - apex_time)
+        reward = 1 - distance
+        # reward = 1 - distance ** 2
+        # reward = 1 - np.exp(-scaling_factor * distance)
+        return reward
 
     def reset(self, chems=None):
         """

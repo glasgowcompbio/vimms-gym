@@ -163,3 +163,17 @@ def update_feature_roi(feature, i, state):
     state['roi_intensity_diff_8'][i] = roi_intensity_diff_8
 
     state['avg_roi_intensities'][i] = avg_intensity
+
+
+def shifted_sigmoid(x, sigmoid_range=2, sigmoid_shift=-1):
+    """
+    The shifted_sigmoid function is a modified sigmoid function that starts
+    at 0 when x is 0 and has an upper bound of 1.0. The sigmoid function is
+    transformed by scaling it with the sigmoid_range variable and shifting it
+    using the sigmoid_shift variable.
+    :param x: Input to the shifted_sigmoid function
+    :param sigmoid_range: Scaling factor for the sigmoid function (default: 2)
+    :param sigmoid_shift: Shifting factor for the sigmoid function (default: -1)
+    :return: Transformed sigmoid value
+    """
+    return (sigmoid_range / (1 + np.exp(-x))) + sigmoid_shift

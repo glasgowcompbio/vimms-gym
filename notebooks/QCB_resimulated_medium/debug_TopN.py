@@ -6,12 +6,8 @@ sys.path.append('../..')
 import pandas as pd
 
 from vimms.Common import set_log_level_warning, load_obj
-from vimms.Noise import UniformSpikeNoise
-from vimms.MassSpec import IndependentMassSpectrometer
-from vimms.Controller import TopNController
-from vimms.Environment import Environment
 
-from vimms_gym.evaluation import evaluate, run_method
+from vimms_gym.evaluation import run_method
 from vimms_gym.common import METHOD_TOPN, METHOD_RANDOM
 from vimms_gym.experiments import preset_qcb_medium
 
