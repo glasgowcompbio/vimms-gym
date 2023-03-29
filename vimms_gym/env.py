@@ -348,6 +348,7 @@ class DDAEnv(gym.Env):
         try:
             f = self.features[idx]
             f.fragmented = True
+            f.excluded = True
 
             # update exclusion for the selected feature
             if self.use_dew:
@@ -360,13 +361,19 @@ class DDAEnv(gym.Env):
         except IndexError:  # idx selects a non-existing feature
             pass
 
+        # NOTE: Commented to make it the same as the Top-N controller in ViMMS, where
+        # we only check for exclusion upon processing of MS1 scan, not MS2 scans.
+        # Doing this seems to decrease performance in Top-N policy in vimms-gym vs
+        # the Top-N controller in ViMMS.
+
         # update exclusion elapsed time for all features
-        if self.use_dew:
-            for i in range(len(self.features)):
-                f = self.features[i]
-                excluded = self._get_excluded(f.mz, current_rt)
-                state['excluded'][i] = excluded
-                f.excluded = excluded
+        # if self.use_dew:
+        #     for i in range(len(self.features)):
+        #         f = self.features[i]
+        #         excluded = self._get_excluded(f.mz, current_rt)
+        #         state['excluded'][i] = excluded
+        #         f.excluded = excluded
+
         state['ms_level'] = 1
         self.num_fragmented += 1
         return state
