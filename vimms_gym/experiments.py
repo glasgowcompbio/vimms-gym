@@ -153,26 +153,21 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
 
     elif model_name == METHOD_PPO:
 
-        # best looking balance between reward, training time
-        # and other parameters from tensorboard
-        # alpha   = 0.25
-        # beta    = 0.50
-        # horizon = 4
-
+        # trial 0, 200K steps
         n_steps = 1024
-        batch_size = 128
-        gamma = 0.98
-        learning_rate = 2.82E-05
+        batch_size = 256
+        gamma = 0.9
+        learning_rate = 0.0035581113762991547
         lr_schedule = 'constant'
-        ent_coef = 0.021632204
+        ent_coef = 0.00621482990403185
         clip_range = 0.1
         n_epochs = 10
         gae_lambda = 0.99
-        max_grad_norm = 0.8
-        vf_coef = 0.740334825
+        max_grad_norm = 0.9
+        vf_coef = 0.703674969829985
         ortho_init = False
-        activation_fn = 'relu'
-        net_arch = 'medium'
+        activation_fn = 'tanh'
+        net_arch = 'small'
 
         if lr_schedule == 'linear':
             learning_rate = linear_schedule(learning_rate)
