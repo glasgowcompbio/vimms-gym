@@ -38,7 +38,7 @@ def get_qcb_filename():
 
 
 def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
-    max_peaks = 100
+    max_peaks = 10
     base_dir, mzml_filename, from_notebook = get_qcb_filename()
     samplers_pickle_prefix = 'samplers_QCB_small'
     n_chemicals = (20, 50)
@@ -105,7 +105,7 @@ def preset_qcb_small(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
 
 def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
-    max_peaks = 200
+    max_peaks = 30
     base_dir, mzml_filename, from_notebook = get_qcb_filename()
     samplers_pickle_prefix = 'samplers_QCB_medium'
     n_chemicals = (200, 500)
@@ -211,7 +211,7 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
 
 
 def preset_qcb_large(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=False):
-    max_peaks = 200
+    max_peaks = 100
     base_dir, mzml_filename, from_notebook = get_qcb_filename()
     samplers_pickle_prefix = 'samplers_QCB_large'
     n_chemicals = (2000, 5000)

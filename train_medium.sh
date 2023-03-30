@@ -2,7 +2,7 @@
 
 env_name="DDAEnv"
 model_name="PPO"
-timesteps=10E6
+timesteps=1.0E6
 repeat=1
 verbose=2
 preset="QCB_resimulated_medium"
