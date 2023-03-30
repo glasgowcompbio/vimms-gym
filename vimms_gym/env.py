@@ -580,22 +580,7 @@ class DDAEnv(gym.Env):
         return reward
 
     def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, frag_time):
-
-        # intensity_reward = self._compute_intensity_gain_reward(chem, chem_frag_int)
-
-        rel_frag_time = frag_time - chem.rt
-        chrom = chem.chromatogram
-        apex_reward = self._compute_apex_reward(chrom, rel_frag_time)
-        if chem in self.frag_chem_time:
-            rel_last_frag_time = self.frag_chem_time[chem] - chem.rt
-            last_apex_reward = self._compute_apex_reward(chrom, rel_last_frag_time)
-            apex_reward = max(0, apex_reward - last_apex_reward)
-
-        reward = apex_reward
-
-        # print(apex_reward)
-        assert 0 <= reward <= 1
-
+        reward = self._compute_intensity_gain_reward(chem, chem_frag_int)
         return reward
 
     def _compute_intensity_gain_reward(self, chem, chem_frag_int):
@@ -608,37 +593,6 @@ class DDAEnv(gym.Env):
         intensity_difference = abs(log_chem_frag_int - log_last_frag_int)
         intensity_gain = intensity_difference / max(log_chem_frag_int, log_last_frag_int)
         return np.clip(intensity_gain, 0, 1)
-
-    def _compute_apex_reward(self, chrom, rel_frag_time, scaling_factor=10.0):
-        """
-        Compute the apex reward for a given chromatogram and relative fragmentation time.
-        The apex reward is based on the distance between the relative fragmentation time and the
-        apex time of the chromatogram, normalized by the chromatogram's retention time range.
-        The closer the relative fragmentation time is to the apex time, the higher the reward.
-
-        Args:
-            chrom: The chromatogram of the chemical.
-            rel_frag_time: The relative fragmentation time.
-            scaling_factor: A positive scaling factor controlling the penalty for suboptimal fragmentation times.
-
-        Returns:
-            float: The apex reward, in the range [0, 1].
-        """
-        min_rt = chrom.min_rt
-        max_rt = chrom.max_rt
-        apex_time = chrom.get_apex_rt()
-        normalized_frag_time = (rel_frag_time - min_rt) / (max_rt - min_rt)
-        normalized_apex_time = (apex_time - min_rt) / (max_rt - min_rt)
-        apex_reward = self.apex_reward(normalized_frag_time, normalized_apex_time,
-                                       scaling_factor)
-        return apex_reward
-
-    def apex_reward(self, frag_time, apex_time, scaling_factor):
-        distance = abs(frag_time - apex_time)
-        reward = 1 - distance
-        # reward = 1 - distance ** 2
-        # reward = 1 - np.exp(-scaling_factor * distance)
-        return reward
 
     def reset(self, chems=None):
         """
