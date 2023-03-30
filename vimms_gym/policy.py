@@ -42,7 +42,7 @@ def topN_policy(obs, features, N, min_ms1_intensity):
     scan_df.loc[scan_df['log_intensities'] < np.log(min_ms1_intensity), 'above_min_intensity'] = 0
 
     # check whether N ions have been fragmented
-    scaled_fragmented_count = count_df.loc['fragmented_count'].values[0]
+    scaled_fragmented_count = count_df.loc['num_fragmented'].values[0]
     fragmented_count = np.round(scaled_fragmented_count * len(features))
     if fragmented_count >= N:
         return fullscan_policy(obs)  # if yes, do an MS1 scan

@@ -59,7 +59,6 @@ class DDAEnv(gym.Env):
 
         self.action_space = self._get_action_space()
         self.observation_space = self._get_observation_space()
-        self.valid_actions = np.zeros(self.in_dim)
 
         self.mass_spec = None
         self.controller = None
@@ -109,6 +108,7 @@ class DDAEnv(gym.Env):
             'avg_roi_intensities': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
 
             # valid action indicators, last action and current ms level
+            'valid_actions': spaces.MultiBinary(self.in_dim),
             'last_action': spaces.Discrete(self.in_dim + 1),
             'ms_level': spaces.Discrete(2),  # either MS1 or MS2 scans
 
@@ -151,6 +151,7 @@ class DDAEnv(gym.Env):
             'avg_roi_intensities': np.zeros(self.max_peaks, dtype=np.float32),
 
             # valid action indicators
+            'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
             'ms_level': 0,
             'last_action': 0,
 
@@ -186,7 +187,7 @@ class DDAEnv(gym.Env):
         elif dda_action.ms_level == 2:
             state = self._scan_to_state_ms2(dda_action, scan_to_process)
 
-        self.valid_actions[-1] = 1 # ms1 action is always valid
+        state['valid_actions'][-1] = 1  # ms1 action is always valid
         state['last_action'] = self.last_action
         return state
 
@@ -247,9 +248,9 @@ class DDAEnv(gym.Env):
             state['fragmented'][i] = 0 if not f.fragmented else 1
             if self.use_dew:
                 state['excluded'][i] = 0 if not f.excluded else 1
-            self.valid_actions[i] = 1  # fragmentable
+            state['valid_actions'][i] = 1  # fragmentable
             if f.original_intensity < self.min_ms1_intensity:
-                self.valid_actions[i] = 0 # except when it's below min ms1 intensity
+                state['valid_actions'][i] = 0  # except when it's below min ms1 intensity
             update_feature_roi(f, i, state)  # update ROI information for this feature
 
         state['roi_intensity_at_last_frag'] = scale_intensities(
@@ -299,7 +300,7 @@ class DDAEnv(gym.Env):
         state['fragmented'][idx] = 1
 
         # it's no longer valid to fragment this peak again
-        self.valid_actions[idx] = 0
+        state['valid_actions'][idx] = 0
 
         # find the feature that has been fragmented in this MS2 scan
         current_rt = scan_to_process.rt
@@ -438,7 +439,7 @@ class DDAEnv(gym.Env):
         return self.state, self.last_reward, self.episode_done, info
 
     def action_masks(self):
-        mask = self.valid_actions.astype(bool)
+        mask = self.state['valid_actions'].astype(bool)
         return mask
 
     def _one_step(self, action, scan_to_process):
