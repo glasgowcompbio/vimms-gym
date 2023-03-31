@@ -61,7 +61,8 @@ def debug_run(fname, max_peaks, params, n_eval_episodes=1, deterministic=True):
         actions, states = model.predict(observations, state=states,
                                         episode_start=episode_starts,
                                         deterministic=deterministic)
-        observations, rewards, dones, infos = env.step(actions)
+        observations, rewards, terminateds, truncateds, infos = env.step(actions)
+        dones = terminateds
         # print(actions, rewards, current_reward, current_length, dones)
         episode_starts = dones
         current_reward += rewards[0]

@@ -17,11 +17,10 @@ dependencies:
   - pip
   - pip:
     - vimms
-    - stable-baselines3
     - gym
     - tensorboard
     - optuna
     - plotly
     - kaleido
     - cloudpickle==2.1.0
-    - git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib.git
+    - git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib@feat/gymnasium-support

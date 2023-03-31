@@ -40,12 +40,13 @@ class HistoryWrapper(gym.Wrapper):
     def reset(self, chems=None):
         # Flush the history
         self.obs_history[...] = 0
-        obs = self.env.reset(chems=chems)
+        obs = self.env.reset(options={'chems': chems})
         self.obs_history[..., -obs.shape[-1] :] = obs
         return self._create_obs_from_history()
 
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        done = terminated
         last_ax_size = obs.shape[-1]
 
         self.obs_history = np.roll(self.obs_history, shift=-last_ax_size, axis=-1)

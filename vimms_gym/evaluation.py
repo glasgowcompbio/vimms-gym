@@ -73,7 +73,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
         env = DDAEnv(max_peaks, env_params)
         env = flatten_dict_observations(env)
-        obs = env.reset(chems=chems)
+        obs = env.reset(options={'chems': chems})
         states = None
         done = False
 
@@ -94,7 +94,8 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
             # print(action, unwrapped_obs)
 
             # make one step through the simulation
-            obs, reward, done, info = env.step(action)
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated
             episode_starts = done
 
             # store new episodic information

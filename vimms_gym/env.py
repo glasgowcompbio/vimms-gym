@@ -435,7 +435,8 @@ class DDAEnv(gym.Env):
             if self.ms1_count > 0 and self.ms2_count == 0:
                 self.last_reward = NO_FRAGMENTATION_REWARD
 
-        return self.state, self.last_reward, self.episode_done, info
+        TRUNCATED = False # we never truncate a run
+        return self.state, self.last_reward, self.episode_done, TRUNCATED, info
 
     def action_masks(self):
         mask = self.state['valid_actions'].astype(bool)
@@ -627,14 +628,17 @@ class DDAEnv(gym.Env):
         # reward = 1 - np.exp(-scaling_factor * distance)
         return reward
 
-    def reset(self, chems=None):
+    def reset(self, seed=None, options=None):
         """
         Reset the state of the environment to an initial state
         """
+        super().reset(seed=seed)
+
         # 1. Reset initial states
         self._initial_values()
 
         # 2. Reset generated chemicals
+        chems = options['chems'] if 'chems' in options else None
         self.chems = generate_chemicals(self.chemical_creator_params) if chems is None else chems
 
         # 3. Reset ViMMS environment
@@ -660,7 +664,10 @@ class DDAEnv(gym.Env):
         self.episode_done = False
         ms1_action = DataDependantAction()  # same as the default initial scan
         self.state = self._get_state(self.current_scan, ms1_action)
-        return self.state
+        info = {
+            'current_scan_id': self.current_scan.scan_id,
+        }
+        return self.state, info
 
     def close(self):
         pass
