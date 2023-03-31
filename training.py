@@ -253,6 +253,7 @@ def make_environment(max_peaks, params, horizon):
     def make_env(rank, seed=0):
         def _init():
             env = DDAEnv(max_peaks, params)
+            env.reset(seed=rank)
             check_env(env)
 
             env = flatten_dict_observations(env)

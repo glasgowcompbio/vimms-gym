@@ -303,8 +303,7 @@ class TrialEvalCallback(EvalCallback):
                                                 episode_start=episode_starts,
                                                 deterministic=deterministic)
 
-            observations, rewards, terminateds, truncateds, infos = env.step(actions)
-            dones = terminateds
+            observations, rewards, dones, infos = env.step(actions)
             episode_starts = dones
             current_reward += rewards[0]
             current_length += 1
