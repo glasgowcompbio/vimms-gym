@@ -2,10 +2,10 @@ from abc import abstractmethod
 from collections import defaultdict
 from copy import deepcopy
 
-import gym
+import gymnasium as gym
+from gymnasium import spaces
 import numpy as np
 import pylab as plt
-from gym import spaces
 from loguru import logger
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from vimms.Common import set_log_level_warning
@@ -128,8 +128,8 @@ class DDAEnv(gym.Env):
         features = {
             # precursor ion features
             'intensities': np.zeros(self.max_peaks, dtype=np.float32),
-            'fragmented': np.zeros(self.max_peaks, dtype=np.float32),
-            'excluded': np.zeros(self.max_peaks, dtype=np.float32),
+            'fragmented': np.zeros(self.max_peaks, dtype=np.int8),
+            'excluded': np.zeros(self.max_peaks, dtype=np.int8),
 
             # roi features
             'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
@@ -150,7 +150,7 @@ class DDAEnv(gym.Env):
             'avg_roi_intensities': np.zeros(self.max_peaks, dtype=np.float32),
 
             # valid action indicators
-            'valid_actions': np.zeros(self.in_dim, dtype=np.float32),
+            'valid_actions': np.zeros(self.in_dim, dtype=np.int8),
             'ms_level': 0,
             'last_action': 0,
 
@@ -638,7 +638,9 @@ class DDAEnv(gym.Env):
         self._initial_values()
 
         # 2. Reset generated chemicals
-        chems = options['chems'] if 'chems' in options else None
+        chems = None
+        if options is not None and 'chems' in options:
+            chems = options['chems']
         self.chems = generate_chemicals(self.chemical_creator_params) if chems is None else chems
 
         # 3. Reset ViMMS environment
