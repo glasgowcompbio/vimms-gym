@@ -19,9 +19,8 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, RENDER_HUMAN, RENDER_RGB_ARRAY, \
     render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, CLIPPED_INTENSITY_LOW, \
-    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA, \
-    PENALTY_SCALE
-from vimms_gym.env_utils import scale_intensities, update_feature_roi, shifted_sigmoid
+    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA
+from vimms_gym.env_utils import scale_intensities, update_feature_roi
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -580,7 +579,8 @@ class DDAEnv(gym.Env):
         return reward
 
     def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, frag_time):
-        reward = self._compute_intensity_gain_reward(chem, chem_frag_int)
+        # reward = self._compute_intensity_gain_reward(chem, chem_frag_int)
+        reward = self._compute_apex_reward(chem, frag_time)
         return reward
 
     def _compute_intensity_gain_reward(self, chem, chem_frag_int):
@@ -593,6 +593,39 @@ class DDAEnv(gym.Env):
         intensity_difference = abs(log_chem_frag_int - log_last_frag_int)
         intensity_gain = intensity_difference / max(log_chem_frag_int, log_last_frag_int)
         return np.clip(intensity_gain, 0, 1)
+
+    def _compute_apex_reward(self, chem, frag_time, scaling_factor=10.0):
+        """
+        Compute the apex reward for a given chromatogram and relative fragmentation time.
+        The apex reward is based on the distance between the relative fragmentation time and the
+        apex time of the chromatogram, normalized by the chromatogram's retention time range.
+        The closer the relative fragmentation time is to the apex time, the higher the reward.
+
+        Args:
+            chrom: The chromatogram of the chemical.
+            frag_time: The fragmentation time.
+            scaling_factor: A positive scaling factor controlling the penalty for suboptimal fragmentation times.
+
+        Returns:
+            float: The apex reward, in the range [0, 1].
+        """
+        rel_frag_time = frag_time - chem.rt
+        chrom = chem.chromatogram
+        min_rt = chrom.min_rt
+        max_rt = chrom.max_rt
+        apex_time = chrom.get_apex_rt()
+        normalized_frag_time = (rel_frag_time - min_rt) / (max_rt - min_rt)
+        normalized_apex_time = (apex_time - min_rt) / (max_rt - min_rt)
+        apex_reward = self.apex_reward(normalized_frag_time, normalized_apex_time,
+                                       scaling_factor)
+        return apex_reward
+
+    def apex_reward(self, frag_time, apex_time, scaling_factor):
+        distance = abs(frag_time - apex_time)
+        reward = 1 - distance
+        # reward = 1 - distance ** 2
+        # reward = 1 - np.exp(-scaling_factor * distance)
+        return reward
 
     def reset(self, chems=None):
         """
