@@ -1,5 +1,3 @@
-# based on https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/dqn.py
-
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/dqn/#dqnpy
 import argparse
 import os
@@ -8,7 +6,7 @@ import time
 from distutils.util import strtobool
 from typing import Callable
 
-import gym
+import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
@@ -16,6 +14,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
+
+from model.identity_env import IdentityEnv, IdentityEnvDiscrete
 
 
 def parse_args():
@@ -38,17 +38,9 @@ def parse_args():
                         help="the wandb's project name")
     parser.add_argument("--wandb-entity", type=str, default=None,
                         help="the entity (team) of wandb's project")
-    parser.add_argument("--capture-video", type=lambda x: bool(strtobool(x)), default=False,
-                        nargs="?", const=True,
-                        help="whether to capture videos of the agent performances (check out `videos` folder)")
     parser.add_argument("--save-model", type=lambda x: bool(strtobool(x)), default=False,
                         nargs="?", const=True,
                         help="whether to save model into the `runs/{run_name}` folder")
-    parser.add_argument("--upload-model", type=lambda x: bool(strtobool(x)), default=False,
-                        nargs="?", const=True,
-                        help="whether to upload the saved model to huggingface")
-    parser.add_argument("--hf-entity", type=str, default="",
-                        help="the user or org name of the model repository from the Hugging Face Hub")
 
     # Algorithm specific arguments
     parser.add_argument("--env-id", type=str, default="CartPole-v1",
@@ -82,14 +74,21 @@ def parse_args():
     return args
 
 
-def make_env(env_id, seed, idx, capture_video, run_name):
+def make_env(env_id, seed):
     def thunk():
-        env = gym.make(env_id)
+
+        # create custom environment here if needed
+        if env_id == 'identity':
+            env = IdentityEnv(dim=10)
+
+        elif env_id == 'identity_masked':
+            env = IdentityEnvDiscrete(dim=10)
+
+        else:  # registered environment
+            env = gym.make(env_id)
+
+        env.reset(seed=seed)
         env = gym.wrappers.RecordEpisodeStatistics(env)
-        if capture_video:
-            if idx == 0:
-                env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
-        env.seed(seed)
         env.action_space.seed(seed)
         env.observation_space.seed(seed)
         return env
@@ -101,12 +100,12 @@ def make_env(env_id, seed, idx, capture_video, run_name):
 class QNetwork(nn.Module):
     def __init__(self, env):
         super().__init__()
+
+        in_features = int(np.array(env.single_observation_space.shape).prod())
         self.network = nn.Sequential(
-            nn.Linear(np.array(env.single_observation_space.shape).prod(), 120),
+            nn.Linear(in_features, 4),
             nn.ReLU(),
-            nn.Linear(120, 84),
-            nn.ReLU(),
-            nn.Linear(84, env.single_action_space.n),
+            nn.Linear(4, env.single_action_space.n),
         )
 
     def forward(self, x):
@@ -123,13 +122,11 @@ def evaluate(
         make_env: Callable,
         env_id: str,
         eval_episodes: int,
-        run_name: str,
         Model: torch.nn.Module,
         device: torch.device = torch.device("cpu"),
         epsilon: float = 0.05,
-        capture_video: bool = True,
 ):
-    envs = gym.vector.SyncVectorEnv([make_env(env_id, 0, 0, capture_video, run_name)])
+    envs = gym.vector.SyncVectorEnv([make_env(env_id, 0)])
     model = Model(envs).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
@@ -153,8 +150,7 @@ def evaluate(
     return episodic_returns
 
 
-if __name__ == "__main__":
-    args = parse_args()
+def main(args):
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
     if args.track:
         import wandb
@@ -184,8 +180,9 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     # env setup
+    NUM_ENVS = 1
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, args.seed, 0, args.capture_video, run_name)])
+        [make_env(args.env_id, args.seed + i) for i in range(NUM_ENVS)])
     assert isinstance(envs.single_action_space,
                       gym.spaces.Discrete), "only discrete action space is supported"
 
@@ -194,36 +191,66 @@ if __name__ == "__main__":
     target_network = QNetwork(envs).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
+    # TODO: ReplayBuffer only supports a single environment for now
+    assert NUM_ENVS == 1
     rb = ReplayBuffer(
         args.buffer_size,
         envs.single_observation_space,
         envs.single_action_space,
         device,
-        handle_timeout_termination=True,
+        optimize_memory_usage=True,
+        handle_timeout_termination=False,
     )
     start_time = time.time()
 
     # TRY NOT TO MODIFY: start the game
-    obs = envs.reset()
+    total_returns = []
+    obs, _ = envs.reset()
     for global_step in range(args.total_timesteps):
         # ALGO LOGIC: put action logic here
         epsilon = linear_schedule(args.start_e, args.end_e,
                                   args.exploration_fraction * args.total_timesteps, global_step)
-        if random.random() < epsilon:
-            actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
-        else:
-            q_values = q_network(torch.Tensor(obs).to(device))
-            actions = torch.argmax(q_values, dim=1).cpu().numpy()
+
+        # Implement action masking. All the codes here assumes that only a single environment
+        # is used, as that's the limitation of the replay buffer anyway.
+        env = envs.envs[0].env
+        try:
+            masks = env.action_masks()
+            if random.random() < epsilon:
+                # masked epsilon move
+                valid_actions = np.argwhere(masks == 1).flatten()
+                actions = np.array([np.random.choice(valid_actions)])
+            else:
+                q_values = q_network(torch.Tensor(obs).to(device))
+                # masked greedy move
+                q_values_np = q_values.detach().cpu().numpy()
+                min_value = 1E-10
+                masked_q_values_np = np.where(masks, q_values_np, min_value)
+                actions = np.array([np.argmax(masked_q_values_np)])
+
+        except AttributeError: # no masking
+            if random.random() < epsilon:
+                actions = np.array([env.action_space.sample()]) # epsilon move
+            else:
+                q_values = q_network(torch.Tensor(obs).to(device))
+                actions = torch.argmax(q_values, dim=1).cpu().numpy() # greedy move
 
         # TRY NOT TO MODIFY: execute the game and log data.
-        next_obs, rewards, dones, infos = envs.step(actions)
+        next_obs, rewards, terminateds, truncateds, infos = envs.step(actions)
+        dones = terminateds
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
-        for info in infos:
-            if "episode" in info.keys():
-                print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
-                writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
-                writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+        if 'final_info' in infos:
+            final_infos = infos['final_info']
+            for info in final_infos:
+                idx = 0
+                episodic_return = info['episode']['r'][0]
+                episodic_length = info['episode']['l'][0]
+                total_returns.append(episodic_return)
+                print(f"global_step={global_step}, episodic_return={episodic_return}, "
+                      f"episodic_length={episodic_length}")
+                writer.add_scalar("charts/episodic_return", episodic_return, global_step)
+                writer.add_scalar("charts/episodic_length", episodic_length, global_step)
                 writer.add_scalar("charts/epsilon", epsilon, global_step)
                 break
 
@@ -231,7 +258,7 @@ if __name__ == "__main__":
         real_next_obs = next_obs.copy()
         for idx, d in enumerate(dones):
             if d:
-                real_next_obs[idx] = infos[idx]["terminal_observation"]
+                real_next_obs[idx] = infos["final_observation"][idx]
         rb.add(obs, real_next_obs, actions, rewards, dones, infos)
 
         # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
@@ -242,16 +269,19 @@ if __name__ == "__main__":
             if global_step % args.train_frequency == 0:
                 data = rb.sample(args.batch_size)
                 with torch.no_grad():
-                    target_max, _ = target_network(data.next_observations).max(dim=1)
+                    x = data.next_observations.float()
+                    target_max, _ = target_network(x).max(dim=1)
                     td_target = data.rewards.flatten() + args.gamma * target_max * (
-                                1 - data.dones.flatten())
-                old_val = q_network(data.observations).gather(1, data.actions).squeeze()
+                            1 - data.dones.flatten())
+
+                x = data.observations.float()
+                old_val = q_network(x).gather(1, data.actions).squeeze()
                 loss = F.mse_loss(td_target, old_val)
 
                 if global_step % 100 == 0:
                     writer.add_scalar("losses/td_loss", loss, global_step)
                     writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
-                    print("SPS:", int(global_step / (time.time() - start_time)))
+                    # print("SPS:", int(global_step / (time.time() - start_time)))
                     writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)),
                                       global_step)
 
@@ -266,7 +296,7 @@ if __name__ == "__main__":
                                                                  q_network.parameters()):
                     target_network_param.data.copy_(
                         args.tau * q_network_param.data + (
-                                    1.0 - args.tau) * target_network_param.data
+                                1.0 - args.tau) * target_network_param.data
                     )
 
     if args.save_model:
@@ -279,7 +309,6 @@ if __name__ == "__main__":
             make_env,
             args.env_id,
             eval_episodes=10,
-            run_name=f"{run_name}-eval",
             Model=QNetwork,
             device=device,
             epsilon=0.05,
@@ -287,12 +316,33 @@ if __name__ == "__main__":
         for idx, episodic_return in enumerate(episodic_returns):
             writer.add_scalar("eval/episodic_return", episodic_return, idx)
 
-        # if args.upload_model:
-        #     from cleanrl_utils.huggingface import push_to_hub
-        #
-        #     repo_name = f"{args.env_id}-{args.exp_name}-seed{args.seed}"
-        #     repo_id = f"{args.hf_entity}/{repo_name}" if args.hf_entity else repo_name
-        #     push_to_hub(args, episodic_returns, repo_id, "DQN", f"runs/{run_name}", f"videos/{run_name}-eval")
-
     envs.close()
     writer.close()
+
+    print(f"mean_episodic_return={np.mean(episodic_return)}")
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    # Set the desired arguments
+    args.exp_name = "dqn_test"
+    args.seed = 42
+    # args.env_id = "CartPole-v1"
+    # args.env_id = 'identity'
+    args.env_id = 'identity_masked'
+    args.total_timesteps = 500000
+    args.learning_rate = 2.5e-4
+    args.buffer_size = 10000
+    args.gamma = 0.99
+    args.tau = 1.
+    args.target_network_frequency = 500
+    args.batch_size = 128
+    args.start_e = 1
+    args.end_e = 0.05
+    args.exploration_fraction = 0.5
+    args.learning_starts = 10000
+    args.train_frequency = 10
+
+    # Call the main training loop
+    main(args)
