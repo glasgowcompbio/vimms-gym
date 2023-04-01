@@ -150,6 +150,7 @@ def evaluate_model(
 
         obs, info = envs.reset(options={'chems': chems})
         done = False
+        eval_data = None
         while not done:
             env = envs.envs[0].env
             actions = masked_epsilon_greedy(device, env, epsilon, obs, model, deterministic=True)
@@ -164,13 +165,12 @@ def evaluate_model(
                 episodic_return = info['episode']['r'][0]
                 episodic_length = info['episode']['l'][0]
 
-                vimms_env = env.env.vimms_env
-                eval_res = evaluate(vimms_env, EVAL_F1_INTENSITY_THRESHOLD)
+                eval_res = evaluate(eval_data)
                 eval_res['invalid_action_count'] = env.invalid_action_count
                 eval_res['total_rewards'] = episodic_return
                 eval_res['episodic_length'] = episodic_length
-                eval_res['num_ms1_scans'] = len(vimms_env.controller.scans[1])
-                eval_res['num_ms2_scans'] = len(vimms_env.controller.scans[2])
+                eval_res['num_ms1_scans'] = len(eval_data.controller.scans[1])
+                eval_res['num_ms2_scans'] = len(eval_data.controller.scans[2])
                 evaluation_results.append(eval_res)
 
                 print(f'Episode {i} ({len(chems)} chemicals) return {episodic_return} length {episodic_length}')
@@ -180,6 +180,11 @@ def evaluate_model(
 
             obs = next_obs
             done = dones[0]
+
+            # store previous results for evaluation before 'done'
+            # this needs to be here, because VecEnv is automatically reset when done
+            vimms_env = env.env.vimms_env
+            eval_data = EvaluationData(vimms_env)
 
     df = pd.DataFrame(evaluation_results)
     pd.set_option('display.max_columns', None)
@@ -330,7 +335,7 @@ def main(args):
         torch.save(q_network.state_dict(), model_path)
         print(f"model saved to {model_path}")
 
-        EVAL_EPISODES = 30
+        EVAL_EPISODES = 3
         episodic_returns = evaluate_model(
             model_path,
             make_env,
