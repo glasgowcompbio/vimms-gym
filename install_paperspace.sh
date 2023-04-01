@@ -1,16 +1,4 @@
 cd ..
-pip install streamlit loguru vimms optuna plotly kaleido cloudpickle==2.1.0
-pip install git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib
-pip install stable-baselines3==1.8.0a10
+pip install streamlit loguru vimms optuna plotly
+pip install git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib@feat/gymnasium-support
 apt-get install -y htop
-
-# cd /notebooks/bin
-# wget https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-linux-amd64
-# mv dbxcli-linux-amd64 dbxcli
-# chmod +x dbxcli
-
-# wget https://github.com/feklee/dbx-tools/archive/refs/tags/v0.7.1.tar.gz
-# tar xvzf v0.7.1.tar.gz
-# rm v0.7.1.tar.gz
-# mv dbx-tools-0.7.1/* .
-# rm -rf dbx-tools-0.7.1
