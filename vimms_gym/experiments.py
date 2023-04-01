@@ -33,6 +33,11 @@ def get_qcb_filename():
         base_dir = '../..'
         mzml_filename = os.path.abspath(os.path.join(base_dir, 'notebooks', 'fullscan_QCB.mzML'))
 
+    if not exists(mzml_filename):
+        from_notebook = False
+        base_dir = '..'
+        mzml_filename = os.path.abspath(os.path.join(base_dir, 'notebooks', 'fullscan_QCB.mzML'))
+
     assert exists(mzml_filename), '%s is missing' % mzml_filename
     return base_dir, mzml_filename, from_notebook
 
