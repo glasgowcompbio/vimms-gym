@@ -154,20 +154,20 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
     elif model_name == METHOD_PPO:
 
         # trial 0, 200K steps
-        n_steps = 1024
-        batch_size = 256
-        gamma = 0.9
-        learning_rate = 0.0035581113762991547
-        lr_schedule = 'constant'
-        ent_coef = 0.00621482990403185
-        clip_range = 0.1
-        n_epochs = 10
-        gae_lambda = 0.99
-        max_grad_norm = 0.9
-        vf_coef = 0.703674969829985
+        n_steps = 256
+        batch_size = 128
+        gamma = 0.999
+        learning_rate = 0.032766616
+        lr_schedule = 'linear'
+        ent_coef = 0.000204818
+        clip_range = 0.3
+        n_epochs = 5
+        gae_lambda = 0.95
+        max_grad_norm = 0.6
+        vf_coef = 0.74786005
         ortho_init = False
-        activation_fn = 'tanh'
-        net_arch = 'small'
+        activation_fn = 'relu'
+        net_arch = 'medium'
 
         if lr_schedule == 'linear':
             learning_rate = linear_schedule(learning_rate)

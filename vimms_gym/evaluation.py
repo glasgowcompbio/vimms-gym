@@ -73,7 +73,7 @@ def run_method(env_name, env_params, max_peaks, chem_list, method, out_dir,
 
         env = DDAEnv(max_peaks, env_params)
         env = flatten_dict_observations(env)
-        obs = env.reset(options={'chems': chems})
+        obs, info = env.reset(options={'chems': chems})
         states = None
         done = False
 
