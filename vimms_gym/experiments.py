@@ -169,7 +169,7 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
         n_epochs = 20
         gae_lambda = 0.99
         max_grad_norm = 5
-        vf_coef = 0.0.413370512
+        vf_coef = 0.413370512
         ortho_init = False
         activation_fn = 'relu'
         net_arch = 'large'
