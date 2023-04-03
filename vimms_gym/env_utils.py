@@ -126,17 +126,16 @@ def update_feature_roi(feature, i, state):
     state['roi_intensity_at_last_frag'][i] = roi_intensity_at_last_frag
     state['roi_min_intensity_since_last_frag'][i] = roi_min_intensity_since_last_frag
     state['roi_max_intensity_since_last_frag'][i] = roi_max_intensity_since_last_frag
-
-    state['roi_intensities_2'][i] = roi_intensities_2
-    state['roi_intensities_3'][i] = roi_intensities_3
-    state['roi_intensities_4'][i] = roi_intensities_4
-    state['roi_intensities_5'][i] = roi_intensities_5
-    state['roi_intensities_6'][i] = roi_intensities_6
-    state['roi_intensities_7'][i] = roi_intensities_7
-    state['roi_intensities_8'][i] = roi_intensities_8
-    state['roi_intensities_9'][i] = roi_intensities_9
-
     state['avg_roi_intensities'][i] = avg_intensity
+
+    state['_roi_intensities_2'][i] = roi_intensities_2
+    state['_roi_intensities_3'][i] = roi_intensities_3
+    state['_roi_intensities_4'][i] = roi_intensities_4
+    state['_roi_intensities_5'][i] = roi_intensities_5
+    state['_roi_intensities_6'][i] = roi_intensities_6
+    state['_roi_intensities_7'][i] = roi_intensities_7
+    state['_roi_intensities_8'][i] = roi_intensities_8
+    state['_roi_intensities_9'][i] = roi_intensities_9
 
 
 def shifted_sigmoid(x, sigmoid_range=2, sigmoid_shift=-1):
