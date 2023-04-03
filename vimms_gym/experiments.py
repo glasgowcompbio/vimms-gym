@@ -172,7 +172,7 @@ def preset_qcb_medium(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=
         vf_coef = 0.413370512
         ortho_init = False
         activation_fn = 'relu'
-        net_arch = 'large'
+        net_arch = 'small'
 
         if lr_schedule == 'linear':
             learning_rate = linear_schedule(learning_rate)
