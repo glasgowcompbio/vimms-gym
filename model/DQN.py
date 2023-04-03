@@ -2,6 +2,7 @@
 import argparse
 import os
 import random
+import socket
 import time
 from distutils.util import strtobool
 from typing import Callable
@@ -472,6 +473,13 @@ def epsilon_greedy(device, env, epsilon, obs, q_network):
     return actions
 
 
+def set_torch_threads():
+    torch_threads = 1  # Set pytorch num threads to 1 for faster training
+    if socket.gethostname() == 'cauchy':  # except on cauchy where we have no gpu, only cpu
+        torch_threads = 40
+    torch.set_num_threads(torch_threads)
+
+
 if __name__ == "__main__":
     args = parse_args()
 
@@ -480,7 +488,7 @@ if __name__ == "__main__":
     args.seed = 42
 
     args.env_id = 'DDAEnv'
-    args.total_timesteps = int(5E6)
+    args.total_timesteps = int(10E6)
     args.learning_rate = 0.00025
     args.buffer_size = int(1E6)
     args.gamma = 0.99
@@ -495,4 +503,5 @@ if __name__ == "__main__":
     args.save_model = True
 
     # Call the main training loop
+    set_torch_threads()
     main(args)
