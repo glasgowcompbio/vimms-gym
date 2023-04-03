@@ -300,8 +300,21 @@ def main(args):
             if global_step % args.train_frequency == 0:
                 data = rb.sample(args.batch_size)
                 with torch.no_grad():
+
+                    # shape is (batch_size, num_features)
                     x = data.next_observations.float()
-                    target_max, _ = target_network(x).max(dim=1)
+
+                    # extract the last 31 columns in x and turn them into a boolean mask
+                    n_mask = max_peaks + 1
+                    mask = x[:, -n_mask:].bool()
+
+                    # Apply the mask to the target network's output
+                    target_q_values = target_network(x)
+                    min_value = float('-inf')
+                    masked_target_q_values = torch.where(mask, target_q_values,
+                                                         torch.tensor(min_value).to(x.device))
+                    target_max, _ = masked_target_q_values.max(dim=1)
+
                     td_target = data.rewards.flatten() + args.gamma * target_max * (
                             1 - data.dones.flatten())
 
