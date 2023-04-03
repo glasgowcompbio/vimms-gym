@@ -246,6 +246,7 @@ def evaluate_model(
     df_summary = df.describe(include='all')
     print(df_summary)
     df_summary.to_csv('df_summary.tsv', sep='\t')
+    df.to_csv('df.tsv', sep='\t')
 
     return episodic_returns
 
