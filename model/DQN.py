@@ -102,17 +102,42 @@ class QNetwork(nn.Module):
     def __init__(self, env):
         super().__init__()
 
-        in_features = 547
-        self.network = nn.Sequential(
-            nn.Linear(in_features, 256),
+        self.n_hidden = [512, 256]
+        self.n_total_features = 547
+        self.n_roi = 30
+        self.roi_length = 10
+        self.n_roi_features = self.n_roi * self.roi_length # 10 rois, each is 30, so total is 300 features
+        self.n_other_features = self.n_total_features - self.n_roi_features # the remaining, which is 247 features
+
+        self.roi_network = nn.Sequential(
+            nn.Linear(self.n_roi_features, self.n_hidden[0]),
             nn.ReLU(),
-            nn.Linear(256, 256),
+            nn.Linear(self.n_hidden[0], self.n_hidden[1]),
             nn.ReLU(),
-            nn.Linear(256, env.single_action_space.n),
         )
 
+        self.other_network = nn.Sequential(
+            nn.Linear(self.n_other_features, self.n_hidden[0]),
+            nn.ReLU(),
+            nn.Linear(self.n_hidden[0], self.n_hidden[1]),
+            nn.ReLU(),
+        )
+
+        output_size = env.single_action_space.n
+        self.output_layer = nn.Linear(self.n_hidden[1]*2, output_size)
+
     def forward(self, x):
-        return self.network(x)
+        roi_inputs = x[:, 0:self.n_roi_features]
+        other_inputs = x[:, self.n_roi_features:]
+        roi_output = self.roi_network(roi_inputs)
+        other_output = self.other_network(other_inputs)
+
+        # Concatenate the outputs of the two networks
+        combined_output = torch.cat((roi_output, other_output), dim=1)
+
+        # Generate Q-value predictions
+        q_values = self.output_layer(combined_output)
+        return q_values
 
 
 def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
