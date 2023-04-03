@@ -101,23 +101,39 @@ class QNetwork(nn.Module):
     def __init__(self, env):
         super().__init__()
 
-        self.n_hidden = [512, 256]
+        self.n_hidden = [128, 64]
         self.n_total_features = 547
         self.n_roi = 30
         self.roi_length = 10
         self.n_roi_features = self.n_roi * self.roi_length  # 10 rois, each is 30, so total is 300 features
         self.n_other_features = self.n_total_features - self.n_roi_features  # the remaining, which is 247 features
 
+        # simple conv1d with maxpool
+        # self.roi_network = nn.Sequential(
+        #     nn.Conv1d(in_channels=self.n_roi, out_channels=self.n_hidden[0], kernel_size=3),
+        #     nn.ReLU(),
+        #     nn.MaxPool1d(kernel_size=3),
+        #     nn.Flatten(start_dim=1),
+        #     nn.Linear(2048, self.n_hidden[1]),
+        #     nn.ReLU(),
+        # )
+
         self.roi_network = nn.Sequential(
-            nn.Conv1d(self.n_roi, self.n_hidden[0], kernel_size=self.roi_length),
+            nn.Conv1d(in_channels=self.n_roi, out_channels=32, kernel_size=3),
             nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),
+            nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),
             nn.Flatten(start_dim=1),
-            nn.Linear(self.n_hidden[0], self.n_hidden[1]),
+            nn.Linear(64, self.n_hidden[1]),
             nn.ReLU(),
         )
 
         self.other_network = nn.Sequential(
             nn.Linear(self.n_other_features, self.n_hidden[0]),
+            nn.ReLU(),
+            nn.Linear(self.n_hidden[0], self.n_hidden[0]),
             nn.ReLU(),
             nn.Linear(self.n_hidden[0], self.n_hidden[1]),
             nn.ReLU(),
