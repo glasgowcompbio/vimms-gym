@@ -22,7 +22,7 @@ from vimms.Evaluation import EvaluationData
 from vimms_gym.common import METHOD_DQN, evaluate, EVAL_F1_INTENSITY_THRESHOLD
 from vimms_gym.env import DDAEnv
 from vimms_gym.experiments import preset_qcb_medium
-from vimms_gym.wrappers import flatten_dict_observations
+from vimms_gym.wrappers import custom_flatten_dict_observations
 
 
 def parse_args():
@@ -86,7 +86,7 @@ def make_env(env_id, seed, max_peaks, params):
 
         env = DDAEnv(max_peaks, params)
         check_env(env)
-        env = flatten_dict_observations(env)
+        env = custom_flatten_dict_observations(env)
 
         env.reset(seed=seed)
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -356,25 +356,31 @@ def main(args):
 
 def masked_epsilon_greedy(device, env, epsilon, obs, q_network, deterministic=False):
     masks = env.action_masks()
-    if not deterministic:
+    if deterministic: # exploitation only
+        actions = masked_greedy(device, masks, obs, q_network)
+
+    else: # exploration and exploitation
         if random.random() < epsilon:
-            # masked epsilon move
-            valid_actions = np.argwhere(masks == 1).flatten()
-            actions = np.array([np.random.choice(valid_actions)])
+            actions = masked_epsilon(masks)
         else:
-            q_values = q_network(torch.Tensor(obs).to(device))
-            # masked greedy move
-            q_values_np = q_values.detach().cpu().numpy()
-            min_value = 1E-10
-            masked_q_values_np = np.where(masks, q_values_np, min_value)
-            actions = np.array([np.argmax(masked_q_values_np)])
-    else:
-        q_values = q_network(torch.Tensor(obs).to(device))
-        # masked greedy move
-        q_values_np = q_values.detach().cpu().numpy()
-        min_value = 1E-10
-        masked_q_values_np = np.where(masks, q_values_np, min_value)
-        actions = np.array([np.argmax(masked_q_values_np)])
+            actions = masked_greedy(device, masks, obs, q_network)
+    return actions
+
+
+def masked_greedy(device, masks, obs, q_network):
+    q_values = q_network(torch.Tensor(obs).to(device))
+    # masked greedy move
+    q_values_np = q_values.detach().cpu().numpy()
+    min_value = float('-inf')
+    masked_q_values_np = np.where(masks, q_values_np, min_value)
+    actions = np.array([np.argmax(masked_q_values_np)])
+    return actions
+
+
+def masked_epsilon(masks):
+    # masked epsilon move
+    valid_actions = np.argwhere(masks == 1).flatten()
+    actions = np.array([np.random.choice(valid_actions)])
     return actions
 
 

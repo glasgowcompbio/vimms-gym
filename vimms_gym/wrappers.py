@@ -1,6 +1,7 @@
-
 import gymnasium as gym
 import numpy as np
+from gymnasium import spaces
+from gymnasium.spaces import Dict, Box, flatten_space
 
 
 # modified from https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/utils/wrappers.py
@@ -41,7 +42,7 @@ class HistoryWrapper(gym.Wrapper):
         # Flush the history
         self.obs_history[...] = 0
         obs = self.env.reset(options={'chems': chems})
-        self.obs_history[..., -obs.shape[-1] :] = obs
+        self.obs_history[..., -obs.shape[-1]:] = obs
         return self._create_obs_from_history()
 
     def step(self, action):
@@ -50,16 +51,39 @@ class HistoryWrapper(gym.Wrapper):
         last_ax_size = obs.shape[-1]
 
         self.obs_history = np.roll(self.obs_history, shift=-last_ax_size, axis=-1)
-        self.obs_history[..., -obs.shape[-1] :] = obs
+        self.obs_history[..., -obs.shape[-1]:] = obs
 
         return self._create_obs_from_history(), reward, done, info
 
 
-# copied from https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/utils/utils.py
+# copied from https://github.com/DLR-RM/rl-baselines3-zoo/blob/feat/gymnasium-support/rl_zoo3/utils.py
 def flatten_dict_observations(env: gym.Env) -> gym.Env:
-    assert isinstance(env.observation_space, gym.spaces.Dict)
-    try:
-        return gym.wrappers.FlattenObservation(env)
-    except AttributeError:
-        keys = env.observation_space.spaces.keys()
-        return gym.wrappers.FlattenDictWrapper(env, dict_keys=list(keys))
+    assert isinstance(env.observation_space, spaces.Dict)
+    return gym.wrappers.FlattenObservation(env)
+
+
+# modified from above to separate the dict space into different parts
+def custom_flatten_dict_observations(env: gym.Env) -> gym.Env:
+    assert isinstance(env.observation_space, spaces.Dict)
+    return CustomFlattenObservation(env)
+
+
+class CustomFlattenObservation(gym.ObservationWrapper, gym.utils.RecordConstructorArgs):
+    """Observation wrapper that flattens the observation in a custom way"""
+
+    def __init__(self, env: gym.Env):
+        gym.utils.RecordConstructorArgs.__init__(self)
+        gym.ObservationWrapper.__init__(self, env)
+        self.observation_space = self._flatten_space_dict(env.observation_space)
+
+    def observation(self, observation):
+        return spaces.flatten(self.env.observation_space, observation)
+
+    def _flatten_space_dict(self, space: Dict) -> Box:
+        space_list = [flatten_space(s) for s in space.spaces.values()]
+        flat_space = Box(
+            low=np.concatenate([s.low for s in space_list]),
+            high=np.concatenate([s.high for s in space_list]),
+            dtype=np.result_type(*[s.dtype for s in space_list]),
+        )
+        return flat_space

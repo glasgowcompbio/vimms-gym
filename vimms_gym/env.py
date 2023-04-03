@@ -406,9 +406,7 @@ class DDAEnv(gym.Env):
         One step = perform either an MS1 or an MS2 scan
         """
         self.step_no += 1
-        info = {
-            'current_scan_id': self.current_scan.scan_id,
-        }
+        info = {}
 
         # get next scan and next state
         next_scan, episode_done, dda_action, is_valid = self._one_step(
@@ -419,6 +417,10 @@ class DDAEnv(gym.Env):
             assert next_scan.ms_level == dda_action.ms_level
             self.state = self._get_state(next_scan, dda_action)
             self.last_reward = self._compute_reward(next_scan, dda_action, is_valid)
+            info = {
+                'current_scan_id': self.current_scan.scan_id,
+                'action_masks': self.action_masks()
+            }
             if next_scan.ms_level == 1:
                 self.last_ms1_scan = next_scan
                 self.ms1_count += 1
