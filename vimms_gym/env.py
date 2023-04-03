@@ -204,12 +204,27 @@ class DDAEnv(gym.Env):
         # key: last (mz, rt, intensity) of an ROI, value: the ROI object
         last_datum_to_roi = {roi.get_last_datum(): roi for roi in live_rois}
 
+        # filter out all points with no ROI
+        # This happens only for noise peaks, which as no associated chemical
+        # TODO: I think we should handle this better?
+        keeps = []
+        for mz, intensity in zip(mzs, intensities):
+            last_datum = (mz, rt, intensity)
+            keep = True if last_datum in last_datum_to_roi else False
+            keeps.append(keep)
+        keeps = np.array(keeps)
+        mzs_keep = mzs[keeps]
+        intensities_keep = intensities[keeps]
+
         # get the N most intense features first
         features = []
-        sorted_indices = np.flip(intensities.argsort())
-        for i in sorted_indices[0:self.max_peaks]:
-            mz = mzs[i]
-            original_intensity = intensities[i]
+        sorted_indices = np.flip(intensities_keep.argsort())
+        N = min(len(intensities_keep), self.max_peaks)
+        for i in sorted_indices[0:N]:
+            mz = mzs_keep[i]
+            intensity = intensities_keep[i]
+            last_datum = (mz, rt, intensity)
+            roi = last_datum_to_roi[last_datum]
 
             # initially nothing has been fragmented
             fragmented = False
@@ -220,20 +235,7 @@ class DDAEnv(gym.Env):
                 current_rt = scan_to_process.rt
                 excluded = self._get_excluded(mz, current_rt)
 
-            try:
-                last_datum = (mz, rt, original_intensity)
-                roi = last_datum_to_roi[last_datum]
-            except KeyError:
-                # This happens only for noise peaks, which as no associated chemical
-                # TODO: I think we should handle this better?
-                roi = None
-
-                # print('Missing: %f %f %f' % last_datum)
-                # for roi in self.roi_builder.live_roi:
-                #     print('%s: %s' % (roi, roi.get_last_datum()))
-
-            feature = Feature(mz, rt, original_intensity,
-                              fragmented, excluded, roi)
+            feature = Feature(mz, rt, intensity, fragmented, excluded, roi)
             features.append(feature)
         self.features = features
 
