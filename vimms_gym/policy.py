@@ -57,7 +57,7 @@ def topN_policy(obs, features, N, min_ms1_intensity):
 
     # select the most intense peak to fragment
     else:
-        idx = filtered['intensities'].idxmax()
+        idx = filtered['_roi_intensities_1'].idxmax()
 
         # some checks on the selected feature to fragment
         f = features[idx]
