@@ -61,7 +61,7 @@ def topN_policy(obs, features, N, min_ms1_intensity):
 
         # some checks on the selected feature to fragment
         f = features[idx]
-        assert f.original_intensity > min_ms1_intensity # check above min intensity
+        assert f.intensity > min_ms1_intensity # check above min intensity
         assert not f.excluded # check not currently excluded
         assert not f.fragmented # check not fragmented before
         return idx

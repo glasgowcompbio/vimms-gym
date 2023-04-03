@@ -7,15 +7,13 @@ class DataDependantAction():
         self.mz = None
         self.rt = None
         self.original_intensity = None
-        self.scaled_intensity = None
         self.ms_level = 1
         self.idx = None
 
-    def target(self, mz, rt, original_intensity, scaled_intensity, idx):
+    def target(self, mz, rt, original_intensity, idx):
         self.mz = mz
         self.rt = rt
         self.original_intensity = original_intensity
-        self.scaled_intensity = scaled_intensity
         self.idx = idx
         self.ms_level = 2
 
@@ -34,9 +32,9 @@ class DataDependantAcquisitionAgent(AbstractAgent):
         self.dda_action = DataDependantAction()
         return self.dda_action
 
-    def target_ms2(self, mz, rt, original_intensity, scaled_intensity, idx):
+    def target_ms2(self, mz, rt, original_intensity, idx):
         self.dda_action = DataDependantAction()
-        self.dda_action.target(mz, rt, original_intensity, scaled_intensity, idx)
+        self.dda_action.target(mz, rt, original_intensity, idx)
         return self.dda_action
 
     def next_tasks(self, scan_to_process, controller, current_task_id):

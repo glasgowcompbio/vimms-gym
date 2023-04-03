@@ -232,7 +232,7 @@ class DDAEnv(gym.Env):
                 # for roi in self.roi_builder.live_roi:
                 #     print('%s: %s' % (roi, roi.get_last_datum()))
 
-            feature = Feature(mz, rt, original_intensity, None,
+            feature = Feature(mz, rt, original_intensity,
                               fragmented, excluded, roi)
             features.append(feature)
         self.features = features
@@ -243,12 +243,12 @@ class DDAEnv(gym.Env):
         state = self._initial_state()
         for i in range(num_features):
             f = features[i]
-            state['intensities'][i] = f.original_intensity
+            state['intensities'][i] = f.intensity
             state['fragmented'][i] = 0 if not f.fragmented else 1
             if self.use_dew:
                 state['excluded'][i] = 0 if not f.excluded else 1
             state['valid_actions'][i] = 1  # fragmentable
-            if f.original_intensity < self.min_ms1_intensity:
+            if f.intensity < self.min_ms1_intensity:
                 state['valid_actions'][i] = 0  # except when it's below min ms1 intensity
             update_feature_roi(f, i, state)  # update ROI information for this feature
 
@@ -463,28 +463,25 @@ class DDAEnv(gym.Env):
             target_mz = 0
             target_rt = 0
             target_original_intensity = 0
-            target_scaled_intensity = 0
             try:
                 f = self.features[idx]
                 if f.fragmented:
                     # check if targeting a feature that has been fragmented before
                     is_valid = False
-                elif f.original_intensity < self.min_ms1_intensity:
+                elif f.intensity < self.min_ms1_intensity:
                     # check if targeting a feature below min intensity
                     is_valid = False
                 else:
                     # valid MS2 target
                     target_mz = f.mz
                     target_rt = f.rt
-                    target_original_intensity = f.original_intensity
-                    target_scaled_intensity = f.scaled_intensity
+                    target_original_intensity = f.intensity
 
             except IndexError:
                 is_valid = False
 
             dda_action = self.controller.agent.target_ms2(target_mz, target_rt,
-                                                          target_original_intensity,
-                                                          target_scaled_intensity, idx)
+                                                          target_original_intensity, idx)
 
         # Ask controller to process the scan based on action
         # Advance mass spec to process the resulting scan, and check if we're done.

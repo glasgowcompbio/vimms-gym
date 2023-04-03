@@ -5,19 +5,17 @@ from vimms.Exclusion import TopNExclusion
 
 class Feature():
     def __init__(
-            self, mz, rt, original_intensity, scaled_intensity,
-            fragmented, excluded, roi):
+            self, mz, rt, intensity, fragmented, excluded, roi):
         self.mz = mz
         self.rt = rt
-        self.scaled_intensity = scaled_intensity
-        self.original_intensity = original_intensity
+        self.intensity = intensity
         self.fragmented = fragmented
         self.excluded = excluded
         self.roi = roi
 
     def __repr__(self):
         return f'mz={self.mz} rt={self.rt} ' \
-               f'intensity={self.original_intensity} ({self.scaled_intensity}) ' \
+               f'intensity={self.intensity} ' \
                f'fragmented={self.fragmented} ' \
                f'roi={self.roi}'
 
@@ -56,7 +54,7 @@ def obs_to_dfs(obs, features):
     log_intensities = np.zeros(len(scan_df))
     for i in range(len(features)):
         f = features[i]
-        log_intensities[i] = np.log(f.original_intensity)
+        log_intensities[i] = np.log(f.intensity)
     scan_df['log_intensities'] = log_intensities
 
     # create a dataframe to hold various counts
