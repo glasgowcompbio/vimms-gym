@@ -16,10 +16,10 @@ import torch.optim as optim
 from gymnasium.utils.env_checker import check_env
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
-from vimms.Common import load_obj, save_obj
+from vimms.Common import load_obj
 from vimms.Evaluation import EvaluationData
 
-from vimms_gym.common import METHOD_DQN, evaluate, EVAL_F1_INTENSITY_THRESHOLD
+from vimms_gym.common import METHOD_DQN, evaluate
 from vimms_gym.env import DDAEnv
 from vimms_gym.experiments import preset_qcb_medium
 from vimms_gym.wrappers import custom_flatten_dict_observations
@@ -83,7 +83,6 @@ def parse_args():
 
 def make_env(env_id, seed, max_peaks, params):
     def thunk():
-
         env = DDAEnv(max_peaks, params)
         check_env(env)
         env = custom_flatten_dict_observations(env)
@@ -106,12 +105,13 @@ class QNetwork(nn.Module):
         self.n_total_features = 547
         self.n_roi = 30
         self.roi_length = 10
-        self.n_roi_features = self.n_roi * self.roi_length # 10 rois, each is 30, so total is 300 features
-        self.n_other_features = self.n_total_features - self.n_roi_features # the remaining, which is 247 features
+        self.n_roi_features = self.n_roi * self.roi_length  # 10 rois, each is 30, so total is 300 features
+        self.n_other_features = self.n_total_features - self.n_roi_features  # the remaining, which is 247 features
 
         self.roi_network = nn.Sequential(
-            nn.Linear(self.n_roi_features, self.n_hidden[0]),
+            nn.Conv1d(self.n_roi, self.n_hidden[0], kernel_size=self.roi_length),
             nn.ReLU(),
+            nn.Flatten(start_dim=1),
             nn.Linear(self.n_hidden[0], self.n_hidden[1]),
             nn.ReLU(),
         )
@@ -124,16 +124,28 @@ class QNetwork(nn.Module):
         )
 
         output_size = env.single_action_space.n
-        self.output_layer = nn.Linear(self.n_hidden[1]*2, output_size)
+        self.output_layer = nn.Linear(self.n_hidden[1] * 2, output_size)
 
     def forward(self, x):
+        # transform ROI input to the right shape
         roi_inputs = x[:, 0:self.n_roi_features]
+        roi_img_inputs = roi_inputs.view(-1, self.roi_length,
+                                         self.n_roi)  # shape is (batch_size, num_features, num_roi)
+        ndim = roi_img_inputs.ndim
+        roi_img_inputs_transposed = roi_img_inputs.transpose(ndim - 2,
+                                                             ndim - 1)  # shape is (batch_size, num_roi, num_features)
+
+        # shape is still (batch_size, num_roi, num_features)
+        # but here we reversed num_features so the last entry is the last point of the ROI
+        # (ROI is going from left to right in num_features)
+        roi_img_inputs_transposed_flipped = torch.flip(roi_img_inputs_transposed, dims=[ndim - 1])
+        roi_output = self.roi_network(roi_img_inputs_transposed_flipped)
+
         other_inputs = x[:, self.n_roi_features:]
-        roi_output = self.roi_network(roi_inputs)
         other_output = self.other_network(other_inputs)
 
         # Concatenate the outputs of the two networks
-        combined_output = torch.cat((roi_output, other_output), dim=1)
+        combined_output = torch.cat((roi_output, other_output), dim=-1)
 
         # Generate Q-value predictions
         q_values = self.output_layer(combined_output)
@@ -178,7 +190,8 @@ def evaluate_model(
         eval_data = None
         while not done:
             env = envs.envs[0].env
-            actions = masked_epsilon_greedy(device, env, epsilon, obs, model, deterministic=True)
+            actions = masked_epsilon_greedy(device, max_peaks, epsilon, obs, model,
+                                            deterministic=True)
 
             next_obs, rewards, terminateds, truncateds, infos = envs.step(actions)
             dones = terminateds
@@ -198,7 +211,8 @@ def evaluate_model(
                 eval_res['num_ms2_scans'] = len(eval_data.controller.scans[2])
                 evaluation_results.append(eval_res)
 
-                print(f'Episode {i} ({len(chems)} chemicals) return {episodic_return} length {episodic_length}')
+                print(
+                    f'Episode {i} ({len(chems)} chemicals) return {episodic_return} length {episodic_length}')
                 print(eval_res)
 
                 episodic_returns += [episodic_return]
@@ -288,8 +302,7 @@ def main(args):
 
         # Implement action masking. All the codes here assumes that only a single environment
         # is used, as that's the limitation of the replay buffer anyway.
-        env = envs.envs[0].env
-        actions = masked_epsilon_greedy(device, env, epsilon, obs, q_network)
+        actions = masked_epsilon_greedy(device, max_peaks, epsilon, obs, q_network)
 
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, rewards, terminateds, truncateds, infos = envs.step(actions)
@@ -328,15 +341,12 @@ def main(args):
 
                     # shape is (batch_size, num_features)
                     x = data.next_observations.float()
-
-                    # extract the last 31 columns in x and turn them into a boolean mask
-                    n_mask = max_peaks + 1
-                    mask = x[:, -n_mask:].bool()
+                    action_masks = get_action_masks_from_obs(x, max_peaks)
 
                     # Apply the mask to the target network's output
                     target_q_values = target_network(x)
                     min_value = float('-inf')
-                    masked_target_q_values = torch.where(mask, target_q_values,
+                    masked_target_q_values = torch.where(action_masks, target_q_values,
                                                          torch.tensor(min_value).to(x.device))
                     target_max, _ = masked_target_q_values.max(dim=1)
 
@@ -392,12 +402,26 @@ def main(args):
     print(f"mean_episodic_return={np.mean(episodic_return)}")
 
 
-def masked_epsilon_greedy(device, env, epsilon, obs, q_network, deterministic=False):
-    masks = env.action_masks()
-    if deterministic: # exploitation only
+def get_action_masks_from_obs(obs, max_peaks):
+    # extract the last max_peaks+1 columns in obs and turn them into a boolean mask
+    n_mask = max_peaks + 1
+
+    if isinstance(obs, torch.Tensor):
+        action_masks = obs[:, -n_mask:].bool()
+    elif isinstance(obs, np.ndarray):
+        action_masks = obs[:, -n_mask:].astype(bool)
+    else:
+        raise TypeError("Unsupported input type {}".format(type(obs)))
+
+    return action_masks
+
+
+def masked_epsilon_greedy(device, max_peaks, epsilon, obs, q_network, deterministic=False):
+    masks = get_action_masks_from_obs(obs, max_peaks)
+    if deterministic:  # exploitation only
         actions = masked_greedy(device, masks, obs, q_network)
 
-    else: # exploration and exploitation
+    else:  # exploration and exploitation
         if random.random() < epsilon:
             actions = masked_epsilon(masks)
         else:
