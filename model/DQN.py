@@ -400,7 +400,7 @@ def main(args):
         torch.save(q_network.state_dict(), model_path)
         print(f"model saved to {model_path}")
 
-        EVAL_EPISODES = 3
+        EVAL_EPISODES = 30
         episodic_returns = evaluate_model(
             model_path,
             make_env,
