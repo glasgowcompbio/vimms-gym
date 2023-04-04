@@ -439,7 +439,7 @@ class DDAEnv(gym.Env):
             if self.ms1_count > 0 and self.ms2_count == 0:
                 self.last_reward = NO_FRAGMENTATION_REWARD
 
-        TRUNCATED = False # we never truncate a run
+        TRUNCATED = False  # we never truncate a run
         return self.state, self.last_reward, self.episode_done, TRUNCATED, info
 
     def action_masks(self):
@@ -580,9 +580,46 @@ class DDAEnv(gym.Env):
         reward = 1 - np.exp(-alpha * x)
         return reward
 
-    def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, frag_time):
-        # reward = self._compute_intensity_gain_reward(chem, chem_frag_int)
-        reward = self._compute_apex_reward(chem, frag_time)
+    def _compute_ms2_reward(self, chem, chem_frag_int):
+        """
+        Compute the reward for selecting an MS2 fragmentation action for a given
+        precursor ion and fragmentation intensity.
+        Args:
+            chem (Chemical): A chemical object in ViMMS that were fragmented by
+                             selecting a precursor ion
+            chem_frag_int (float): The intensity of at which the fragmentation occured
+        Returns:
+            float: The MS2 reward, a value between 0 and 1. The reward is based on
+            two components: a coverage reward and an intensity reward. The coverage
+            reward is a constant reward of 1.0 if the chemical has not been
+            fragmented before, or 0.0 otherwise. The intensity reward is based on
+            the difference between the current fragmentation intensity and the
+            previous fragmentation intensity for the same chemical, multiplied
+            by a scaling parameter beta, and normalized by the maximum intensity
+            of the chemical. The intensity reward is weighted by a scaling
+            parameter alpha that controls the balance between coverage and intensity
+            rewards.
+        The MS2 reward function implemented here is based on the formula:
+            reward = alpha * coverage_reward + (1 - alpha) * intensity_reward
+        where alpha is a scaling parameter that controls the balance between coverage
+        and intensity rewards (should be between 0 and 1), and coverage_reward and
+        intensity_reward are calculated as follows:
+        """
+        if chem not in self.frag_chem_intensity:
+            chem_last_frag_int = 0.0
+            coverage_reward = 1.0
+        else:
+            chem_last_frag_int = self.frag_chem_intensity[chem]
+            coverage_reward = 0.0
+
+        intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
+        log_intensity_reward = np.log(abs(intensity_reward))
+        scaled_log_intensity_reward = log_intensity_reward / MAX_OBSERVED_LOG_INTENSITY
+        if intensity_reward < 0:
+            scaled_log_intensity_reward = scaled_log_intensity_reward * -1
+        intensity_reward = np.clip(scaled_log_intensity_reward, 0, 1)
+
+        reward = (self.alpha * coverage_reward) + ((1 - self.alpha) * intensity_reward)
         return reward
 
     def _compute_intensity_gain_reward(self, chem, chem_frag_int):
