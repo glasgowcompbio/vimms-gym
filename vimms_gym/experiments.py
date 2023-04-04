@@ -227,13 +227,13 @@ def preset_qcb_large(model_name, alpha=ALPHA, beta=BETA, extract_chromatograms=F
 
     if model_name == METHOD_DQN:
 
-        medium_params, max_peaks = preset_qcb_medium(model_name, alpha=alpha, beta=beta,
+        medium_params, _ = preset_qcb_medium(model_name, alpha=alpha, beta=beta,
                                           extract_chromatograms=extract_chromatograms)
         params['model'] = medium_params['model']
 
     elif model_name == METHOD_PPO:
 
-        medium_params, max_peaks = preset_qcb_medium(model_name, alpha=alpha, beta=beta,
+        medium_params, _ = preset_qcb_medium(model_name, alpha=alpha, beta=beta,
                                           extract_chromatograms=extract_chromatograms)
         params['model'] = medium_params['model']
 
