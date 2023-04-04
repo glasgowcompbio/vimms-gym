@@ -98,6 +98,68 @@ def make_env(env_id, seed, max_peaks, params):
 
 
 # ALGO LOGIC: initialize agent here:
+# class QNetwork(nn.Module):
+#     def __init__(self, env):
+#         super().__init__()
+#
+#         self.n_hidden = [128, 64]
+#         self.n_total_features = 547
+#         self.n_roi = 30
+#         self.roi_length = 10
+#         self.n_roi_features = self.n_roi * self.roi_length  # 10 rois, each is 30, so total is 300 features
+#         self.n_other_features = self.n_total_features - self.n_roi_features  # the remaining, which is 247 features
+#
+#         self.roi_network = nn.Sequential(
+#             nn.Conv1d(in_channels=self.n_roi, out_channels=32, kernel_size=3),
+#             nn.ReLU(),
+#             nn.MaxPool1d(kernel_size=2),
+#             nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3),
+#             nn.ReLU(),
+#             nn.MaxPool1d(kernel_size=2),
+#             nn.Flatten(start_dim=1),
+#             nn.Linear(64, self.n_hidden[1]),
+#             nn.ReLU(),
+#         )
+#
+#         self.other_network = nn.Sequential(
+#             nn.Linear(self.n_other_features, self.n_hidden[0]),
+#             nn.ReLU(),
+#             nn.Linear(self.n_hidden[0], self.n_hidden[0]),
+#             nn.ReLU(),
+#             nn.Linear(self.n_hidden[0], self.n_hidden[1]),
+#             nn.ReLU(),
+#         )
+#
+#         output_size = env.single_action_space.n
+#         self.output_layer = nn.Linear(self.n_hidden[1] * 2, output_size)
+#
+#     def forward(self, x):
+#         # transform ROI input to the right shape
+#         roi_inputs = x[:, 0:self.n_roi_features]
+#         roi_img_inputs = roi_inputs.view(-1, self.roi_length,
+#                                          self.n_roi)  # shape is (batch_size, num_features, num_roi)
+#         ndim = roi_img_inputs.ndim
+#         roi_img_inputs_transposed = roi_img_inputs.transpose(ndim - 2,
+#                                                              ndim - 1)  # shape is (batch_size, num_roi, num_features)
+#
+#         # shape is still (batch_size, num_roi, num_features)
+#         # but here we reversed num_features so the last entry is the last point of the ROI
+#         # (ROI is going from left to right in num_features)
+#         roi_img_inputs_transposed_flipped = torch.flip(roi_img_inputs_transposed, dims=[ndim - 1])
+#         roi_output = self.roi_network(roi_img_inputs_transposed_flipped)
+#
+#         other_inputs = x[:, self.n_roi_features:]
+#         other_output = self.other_network(other_inputs)
+#
+#         # Concatenate the outputs of the two networks
+#         combined_output = torch.cat((roi_output, other_output), dim=-1)
+#
+#         # Generate Q-value predictions
+#         q_values = self.output_layer(combined_output)
+#         return q_values
+
+
+# ALGO LOGIC: initialize agent here:
 class QNetwork(nn.Module):
     def __init__(self, env):
         super().__init__()
@@ -109,18 +171,8 @@ class QNetwork(nn.Module):
         self.n_roi_features = self.n_roi * self.roi_length  # 10 rois, each is 30, so total is 300 features
         self.n_other_features = self.n_total_features - self.n_roi_features  # the remaining, which is 247 features
 
-        # simple conv1d with maxpool
-        # self.roi_network = nn.Sequential(
-        #     nn.Conv1d(in_channels=self.n_roi, out_channels=self.n_hidden[0], kernel_size=3),
-        #     nn.ReLU(),
-        #     nn.MaxPool1d(kernel_size=3),
-        #     nn.Flatten(start_dim=1),
-        #     nn.Linear(2048, self.n_hidden[1]),
-        #     nn.ReLU(),
-        # )
-
         self.roi_network = nn.Sequential(
-            nn.Conv1d(in_channels=self.n_roi, out_channels=32, kernel_size=3),
+            nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2),
             nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3),
@@ -141,27 +193,31 @@ class QNetwork(nn.Module):
         )
 
         output_size = env.single_action_space.n
-        self.output_layer = nn.Linear(self.n_hidden[1] * 2, output_size)
+        self.output_layer = nn.Linear(1984, output_size)
 
     def forward(self, x):
         # transform ROI input to the right shape
         roi_inputs = x[:, 0:self.n_roi_features]
-        roi_img_inputs = roi_inputs.view(-1, self.roi_length,
-                                         self.n_roi)  # shape is (batch_size, num_features, num_roi)
+        roi_img_inputs = roi_inputs.view(-1, self.roi_length, self.n_roi)
         ndim = roi_img_inputs.ndim
-        roi_img_inputs_transposed = roi_img_inputs.transpose(ndim - 2,
-                                                             ndim - 1)  # shape is (batch_size, num_roi, num_features)
-
-        # shape is still (batch_size, num_roi, num_features)
-        # but here we reversed num_features so the last entry is the last point of the ROI
-        # (ROI is going from left to right in num_features)
+        roi_img_inputs_transposed = roi_img_inputs.transpose(ndim - 2, ndim - 1)
         roi_img_inputs_transposed_flipped = torch.flip(roi_img_inputs_transposed, dims=[ndim - 1])
-        roi_output = self.roi_network(roi_img_inputs_transposed_flipped)
+
+        # Reshape the tensor to (batch_size * num_roi, 1, num_features)
+        roi_img_inputs_reshaped = roi_img_inputs_transposed_flipped.reshape(-1, 1, self.roi_length)
+
+        # Process each ROI separately
+        roi_output = self.roi_network(roi_img_inputs_reshaped)
+
+        # Reshape the output back to (batch_size, num_roi * hidden_size)
+        roi_output = roi_output.view(-1, self.n_hidden[1] * self.n_roi)
 
         other_inputs = x[:, self.n_roi_features:]
         other_output = self.other_network(other_inputs)
 
         # Concatenate the outputs of the two networks
+        # print("roi_output shape:", roi_output.shape)
+        # print("other_output shape:", other_output.shape)
         combined_output = torch.cat((roi_output, other_output), dim=-1)
 
         # Generate Q-value predictions
