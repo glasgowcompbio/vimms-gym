@@ -580,7 +580,7 @@ class DDAEnv(gym.Env):
         reward = 1 - np.exp(-alpha * x)
         return reward
 
-    def _compute_ms2_reward(self, chem, chem_frag_int):
+    def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, current_rt):
         """
         Compute the reward for selecting an MS2 fragmentation action for a given
         precursor ion and fragmentation intensity.
@@ -588,6 +588,8 @@ class DDAEnv(gym.Env):
             chem (Chemical): A chemical object in ViMMS that were fragmented by
                              selecting a precursor ion
             chem_frag_int (float): The intensity of at which the fragmentation occured
+            chem_frag_count (int): How many times this chem has been fragmented
+            current_rt (float): current retention time
         Returns:
             float: The MS2 reward, a value between 0 and 1. The reward is based on
             two components: a coverage reward and an intensity reward. The coverage
