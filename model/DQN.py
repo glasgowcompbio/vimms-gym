@@ -489,16 +489,16 @@ if __name__ == "__main__":
 
     args.env_id = 'DDAEnv'
     args.total_timesteps = int(10E6)
-    args.learning_rate = 0.00025
+    args.learning_rate = 0.0005
     args.buffer_size = int(1E6)
     args.gamma = 0.99
     args.tau = 1.
-    args.target_network_frequency = 10000
-    args.batch_size = 32
+    args.target_network_frequency = 8000
+    args.batch_size = 64
     args.start_e = 1
-    args.end_e = 0.20
-    args.exploration_fraction = 0.20
-    args.learning_starts = 10000
+    args.end_e = 0.02
+    args.exploration_fraction = 0.1
+    args.learning_starts = 50000
     args.train_frequency = 4
     args.save_model = True
 
