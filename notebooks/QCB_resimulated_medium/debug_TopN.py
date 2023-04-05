@@ -25,14 +25,13 @@ params, max_peaks = preset_qcb_medium(None, alpha=env_alpha, beta=env_beta,
 # %%
 env_name = 'DDAEnv'
 intensity_threshold = 0.5
-max_peaks = 30
 
 methods = [
-    # METHOD_RANDOM,
+    METHOD_RANDOM,
     METHOD_TOPN,
 ]
 valid_random = True
-n_eval_episodes = 5
+n_eval_episodes = 1
 
 # topN parameters
 topN_N = 10

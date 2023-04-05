@@ -1,5 +1,6 @@
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/dqn/#dqnpy
 import argparse
+from datetime import datetime
 import os
 import random
 import socket
@@ -14,6 +15,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import wandb
 from gymnasium.utils.env_checker import check_env
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
@@ -42,7 +44,7 @@ def parse_args():
     parser.add_argument("--track", type=lambda x: bool(strtobool(x)), default=False, nargs="?",
                         const=True,
                         help="if toggled, this experiment will be tracked with Weights and Biases")
-    parser.add_argument("--wandb-project-name", type=str, default="cleanRL",
+    parser.add_argument("--wandb-project-name", type=str, default="DDAEnv",
                         help="the wandb's project name")
     parser.add_argument("--wandb-entity", type=str, default=None,
                         help="the entity (team) of wandb's project")
@@ -299,17 +301,19 @@ def evaluate_model(
             eval_data = EvaluationData(vimms_env)
 
     df = pd.DataFrame(evaluation_results)
+    df = df.astype(float)
     pd.set_option('display.max_columns', None)
     df_summary = df.describe(include='all')
     print(df_summary)
     df_summary.to_csv('df_summary.tsv', sep='\t')
     df.to_csv('df.tsv', sep='\t')
 
-    return episodic_returns
+    return episodic_returns, df, df_summary
 
 
 def main(args):
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+    current_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    run_name = f"{args.env_id}__{args.exp_name}__{current_time}"
     if args.track:
         import wandb
 
@@ -453,12 +457,12 @@ def main(args):
                     )
 
     if args.save_model:
-        model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
+        model_path = f"runs/{run_name}/{args.exp_name}.model"
         torch.save(q_network.state_dict(), model_path)
         print(f"model saved to {model_path}")
 
         EVAL_EPISODES = 30
-        episodic_returns = evaluate_model(
+        episodic_returns, df, df_summary = evaluate_model(
             model_path,
             make_env,
             args.env_id,
@@ -467,8 +471,24 @@ def main(args):
             device=device,
             epsilon=0.05,
         )
+
         for idx, episodic_return in enumerate(episodic_returns):
-            writer.add_scalar("eval/episodic_return", episodic_return, idx)
+            writer.add_scalar("eval/episode/reward", episodic_return, idx)
+            for col in df.columns:
+                val = df.loc[idx, col]
+                writer.add_scalar("eval/episode/%s" % col, val, idx)
+
+        mean_cols = df_summary.loc[['mean']]
+        for column in mean_cols.columns:
+            mean_value = mean_cols.at['mean', column]
+            wandb.log({f"eval/means/{column}": mean_value})
+
+        # mean_values = mean_cols.to_dict()
+        # mean_dict = {key: value['mean'] for key, value in mean_values.items()}
+        # wandb.log({"mean_values": wandb.Table(data=[mean_dict.values()], columns=["Value"],
+        #                                       index=mean_dict.keys())})
+        # table_data = [[key, value] for key, value in mean_dict.items()]
+        # wandb.log({"mean_values": wandb.Table(data=table_data, columns=["Key", "Value"])})
 
     envs.close()
     writer.close()
@@ -540,13 +560,13 @@ if __name__ == "__main__":
     args = parse_args()
 
     # Set the desired arguments
-    args.exp_name = "DDAEnv_test"
+    args.exp_name = "DQN"
     args.seed = 42
 
     args.env_id = 'DDAEnv'
-    args.total_timesteps = int(10E6)
+    args.total_timesteps = int(1E6)
     args.learning_rate = 0.0005
-    args.buffer_size = int(1E6)
+    args.buffer_size = int(5E5)
     args.gamma = 0.99
     args.tau = 1.
     args.target_network_frequency = 8000
@@ -557,6 +577,7 @@ if __name__ == "__main__":
     args.learning_starts = 50000
     args.train_frequency = 4
     args.save_model = True
+    args.track = True
 
     # Call the main training loop
     set_torch_threads()

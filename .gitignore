@@ -152,3 +152,5 @@ model/runs
 df.p
 df_summary.tsv
 runs.tar.gz
+model/wandb
+df.tsv
