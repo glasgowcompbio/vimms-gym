@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from collections import defaultdict
 from copy import deepcopy
+from math import exp
 
 import gymnasium as gym
 from gymnasium import spaces
@@ -542,22 +543,23 @@ class DDAEnv(gym.Env):
 
                     # look up previous fragmented intensity for this chem
                     chem = frag_event.chem
+                    self.frag_chem_count[chem] += 1
                     chem_frag_count = self.frag_chem_count[chem]
 
                     # compute ms2 reward
+                    feature = self.features[dda_action.idx]
                     reward = self._compute_ms2_reward(chem, chem_frag_int, chem_frag_count,
-                                                      frag_event.query_rt)
+                                                      frag_event.query_rt, feature)
 
                     # store new intensity and frag time into dictionaries
                     self.frag_chem_intensity[chem] = chem_frag_int
                     self.frag_chem_time[chem] = frag_event.query_rt
-                    self.frag_chem_count[chem] += 1
 
                 else:
                     # fragmenting a spike noise, or no chem associated with this, so we give no reward
                     reward = 0.0
 
-        assert -1.0 <= reward <= 1
+        assert -1 <= reward <= 1
         return reward
 
     def _compute_ms1_reward(self, num_fragmented, num_total, alpha):
@@ -580,49 +582,60 @@ class DDAEnv(gym.Env):
         reward = 1 - np.exp(-alpha * x)
         return reward
 
-    def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, current_rt):
-        """
-        Compute the reward for selecting an MS2 fragmentation action for a given
-        precursor ion and fragmentation intensity.
-        Args:
-            chem (Chemical): A chemical object in ViMMS that were fragmented by
-                             selecting a precursor ion
-            chem_frag_int (float): The intensity of at which the fragmentation occured
-            chem_frag_count (int): How many times this chem has been fragmented
-            current_rt (float): current retention time
-        Returns:
-            float: The MS2 reward, a value between 0 and 1. The reward is based on
-            two components: a coverage reward and an intensity reward. The coverage
-            reward is a constant reward of 1.0 if the chemical has not been
-            fragmented before, or 0.0 otherwise. The intensity reward is based on
-            the difference between the current fragmentation intensity and the
-            previous fragmentation intensity for the same chemical, multiplied
-            by a scaling parameter beta, and normalized by the maximum intensity
-            of the chemical. The intensity reward is weighted by a scaling
-            parameter alpha that controls the balance between coverage and intensity
-            rewards.
-        The MS2 reward function implemented here is based on the formula:
-            reward = alpha * coverage_reward + (1 - alpha) * intensity_reward
-        where alpha is a scaling parameter that controls the balance between coverage
-        and intensity rewards (should be between 0 and 1), and coverage_reward and
-        intensity_reward are calculated as follows:
-        """
-        if chem not in self.frag_chem_intensity:
-            chem_last_frag_int = 0.0
-            coverage_reward = 1.0
+    def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, current_rt, feature):
+
+        # doesn't work well
+        # if chem not in self.frag_chem_intensity:
+        #     chem_last_frag_int = 0.0
+        #     coverage_reward = 1.0
+        # else:
+        #     chem_last_frag_int = self.frag_chem_intensity[chem]
+        #     coverage_reward = 0.0
+        #
+        # intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
+        # log_intensity_reward = np.log(abs(intensity_reward))
+        # scaled_log_intensity_reward = log_intensity_reward / MAX_OBSERVED_LOG_INTENSITY
+        # if intensity_reward < 0:
+        #     scaled_log_intensity_reward = scaled_log_intensity_reward * -1
+        # intensity_reward = np.clip(scaled_log_intensity_reward, 0, 1)
+        #
+        # reward = (self.alpha * coverage_reward) + ((1 - self.alpha) * intensity_reward)
+
+        # doesn't work well
+        # I_so_far = max(feature.roi.intensity_list)
+        # diff = chem_frag_int - I_so_far
+        # diff_sign = np.sign(diff)
+        # reward = np.clip(np.log(abs(diff)) / MAX_OBSERVED_LOG_INTENSITY, 0, 1)
+        # reward *= diff_sign
+
+        intensity_ratio = chem_frag_int / chem.max_intensity
+        # Fragmentation penalty with a fixed threshold
+
+        # this results in random 70 topN 140
+        threshold = 5  # Experiment with different values of threshold
+        k = 0.1  # Experiment with different values of k
+
+        # # this results in random -44 topN 44
+        # threshold = 5  # Experiment with different values of threshold
+        # k = 0.2  # Experiment with different values of k
+
+        # # this results in random 291 topN 271
+        # threshold = 10  # Experiment with different values of threshold
+        # k = 0.1  # Experiment with different values of k
+
+        # # this results in random 180 topN 217
+        # threshold = 10  # Experiment with different values of threshold
+        # k = 0.2  # Experiment with different values of k
+
+        if chem_frag_count > threshold:
+            fragmentation_penalty = k * (chem_frag_count - threshold)
         else:
-            chem_last_frag_int = self.frag_chem_intensity[chem]
-            coverage_reward = 0.0
+            fragmentation_penalty = 0
 
-        intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
-        log_intensity_reward = np.log(abs(intensity_reward))
-        scaled_log_intensity_reward = log_intensity_reward / MAX_OBSERVED_LOG_INTENSITY
-        if intensity_reward < 0:
-            scaled_log_intensity_reward = scaled_log_intensity_reward * -1
-        intensity_reward = np.clip(scaled_log_intensity_reward, 0, 1)
+        # Calculate the reward_ms2
+        reward_ms2 = np.clip(intensity_ratio - fragmentation_penalty, -1, 1)
+        return reward_ms2
 
-        reward = (self.alpha * coverage_reward) + ((1 - self.alpha) * intensity_reward)
-        return reward
 
     def _compute_intensity_gain_reward(self, chem, chem_frag_int):
         if chem not in self.frag_chem_intensity:
