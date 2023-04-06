@@ -43,6 +43,9 @@ def obs_to_dfs(obs, features):
         try:
             if len(val) == 1:
                 count_obs[key] = val
+            elif isinstance(val, np.ndarray) and val.ndim == 2:
+                # skip 2D NumPy arrays
+                pass
             else:
                 scan_obs[key] = val
         except TypeError: # no length, so must be a scalar

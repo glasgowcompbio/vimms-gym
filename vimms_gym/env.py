@@ -1,12 +1,11 @@
 from abc import abstractmethod
 from collections import defaultdict
 from copy import deepcopy
-from math import exp
 
 import gymnasium as gym
-from gymnasium import spaces
 import numpy as np
 import pylab as plt
+from gymnasium import spaces
 from loguru import logger
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from vimms.Common import set_log_level_warning
@@ -21,7 +20,8 @@ from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, RENDER_HUMAN, RENDER_RGB_ARRAY, \
     render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, CLIPPED_INTENSITY_LOW, \
     CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA
-from vimms_gym.env_utils import scale_intensities, update_feature_roi
+from vimms_gym.env_utils import scale_intensities, update_feature_roi, RoiTracker, \
+    normalize_roi_data
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -36,6 +36,7 @@ class DDAEnv(gym.Env):
         assert len(params) > 0
         self.max_peaks = max_peaks
         self.in_dim = self.max_peaks + 1  # 0 is for MS1
+        self.num_roi_features = 10
 
         self.chemical_creator_params = params['chemical_creator']
         self.noise_params = params['noise']
@@ -97,15 +98,8 @@ class DDAEnv(gym.Env):
             'avg_roi_intensities': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
 
             # roi intensity features
-            '_roi_intensities_1': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
-            '_roi_intensities_2': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
-            '_roi_intensities_3': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
-            '_roi_intensities_4': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
-            '_roi_intensities_5': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
-            '_roi_intensities_6': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
-            '_roi_intensities_7': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
-            '_roi_intensities_8': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
-            '_roi_intensities_9': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
+            '_roi_intensities': spaces.Box(low=lo, high=hi, shape=(
+                self.max_peaks, self.num_roi_features)),
 
             # valid action indicators, last action and current ms level
             'valid_actions': spaces.MultiBinary(self.in_dim),
@@ -140,15 +134,8 @@ class DDAEnv(gym.Env):
             'avg_roi_intensities': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi intensity features
-            '_roi_intensities_1': np.zeros(self.max_peaks, dtype=np.float32),
-            '_roi_intensities_2': np.zeros(self.max_peaks, dtype=np.float32),
-            '_roi_intensities_3': np.zeros(self.max_peaks, dtype=np.float32),
-            '_roi_intensities_4': np.zeros(self.max_peaks, dtype=np.float32),
-            '_roi_intensities_5': np.zeros(self.max_peaks, dtype=np.float32),
-            '_roi_intensities_6': np.zeros(self.max_peaks, dtype=np.float32),
-            '_roi_intensities_7': np.zeros(self.max_peaks, dtype=np.float32),
-            '_roi_intensities_8': np.zeros(self.max_peaks, dtype=np.float32),
-            '_roi_intensities_9': np.zeros(self.max_peaks, dtype=np.float32),
+            '_roi_intensities': np.zeros((self.max_peaks, self.num_roi_features),
+                                         dtype=np.float32),
 
             # valid action indicators
             'valid_actions': np.zeros(self.in_dim, dtype=np.int8),
@@ -205,7 +192,7 @@ class DDAEnv(gym.Env):
         # key: last (mz, rt, intensity) of an ROI, value: the ROI object
         last_datum_to_roi = {roi.get_last_datum(): roi for roi in live_rois}
 
-        # filter out all points with no ROI
+        # Filter out all points with no ROI
         # This happens only for noise peaks, which as no associated chemical
         # TODO: I think we should handle this better?
         keeps = []
@@ -217,7 +204,8 @@ class DDAEnv(gym.Env):
         mzs_keep = mzs[keeps]
         intensities_keep = intensities[keeps]
 
-        # get the N most intense features first
+        # Get the N most intense features first
+        # now that each feature corresponds to an ROI, we can consider them the same
         features = []
         sorted_indices = np.flip(intensities_keep.argsort())
         N = min(len(intensities_keep), self.max_peaks)
@@ -246,7 +234,6 @@ class DDAEnv(gym.Env):
         state = self._initial_state()
         for i in range(num_features):
             f = features[i]
-            state['_roi_intensities_1'][i] = f.intensity
             state['fragmented'][i] = 0 if not f.fragmented else 1
             if self.use_dew:
                 state['excluded'][i] = 0 if not f.excluded else 1
@@ -261,28 +248,10 @@ class DDAEnv(gym.Env):
             state['roi_min_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
         state['roi_max_intensity_since_last_frag'] = scale_intensities(
             state['roi_max_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-
         state['avg_roi_intensities'] = scale_intensities(
             state['avg_roi_intensities'], num_features, MAX_OBSERVED_LOG_INTENSITY)
 
-        state['_roi_intensities_1'] = scale_intensities(
-            state['_roi_intensities_1'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['_roi_intensities_2'] = scale_intensities(
-            state['_roi_intensities_2'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['_roi_intensities_3'] = scale_intensities(
-            state['_roi_intensities_3'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['_roi_intensities_4'] = scale_intensities(
-            state['_roi_intensities_4'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['_roi_intensities_5'] = scale_intensities(
-            state['_roi_intensities_5'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['_roi_intensities_6'] = scale_intensities(
-            state['_roi_intensities_6'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['_roi_intensities_7'] = scale_intensities(
-            state['_roi_intensities_7'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['_roi_intensities_8'] = scale_intensities(
-            state['_roi_intensities_8'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['_roi_intensities_9'] = scale_intensities(
-            state['_roi_intensities_9'], num_features, MAX_OBSERVED_LOG_INTENSITY)
+        state['_roi_intensities'] = normalize_roi_data(state['_roi_intensities'])
 
         state['ms_level'] = 0
         self.num_fragmented = 0
@@ -390,6 +359,7 @@ class DDAEnv(gym.Env):
         # track regions of interest
         smartroi_params = SmartRoiParams()
         self.roi_builder = RoiBuilder(self.roi_params, smartroi_params=smartroi_params)
+        self.roi_tracker = RoiTracker(self.max_peaks, self.num_roi_features)
 
         # track excluded ions
         if self.use_dew:
@@ -584,49 +554,17 @@ class DDAEnv(gym.Env):
 
     def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, current_rt, feature):
 
-        # doesn't work well
-        # if chem not in self.frag_chem_intensity:
-        #     chem_last_frag_int = 0.0
-        #     coverage_reward = 1.0
-        # else:
-        #     chem_last_frag_int = self.frag_chem_intensity[chem]
-        #     coverage_reward = 0.0
-        #
-        # intensity_reward = chem_frag_int - (self.beta * chem_last_frag_int)
-        # log_intensity_reward = np.log(abs(intensity_reward))
-        # scaled_log_intensity_reward = log_intensity_reward / MAX_OBSERVED_LOG_INTENSITY
-        # if intensity_reward < 0:
-        #     scaled_log_intensity_reward = scaled_log_intensity_reward * -1
-        # intensity_reward = np.clip(scaled_log_intensity_reward, 0, 1)
-        #
-        # reward = (self.alpha * coverage_reward) + ((1 - self.alpha) * intensity_reward)
-
-        # doesn't work well
-        # I_so_far = max(feature.roi.intensity_list)
-        # diff = chem_frag_int - I_so_far
-        # diff_sign = np.sign(diff)
-        # reward = np.clip(np.log(abs(diff)) / MAX_OBSERVED_LOG_INTENSITY, 0, 1)
-        # reward *= diff_sign
-
         intensity_ratio = chem_frag_int / chem.max_intensity
+
+        # some experiments with different values:
+        # threshold=5,  k=0.1, random=70,  topN=140
+        # threshold=5,  k=0.2, random=-44, topN=44
+        # threshold=10, k=0.1, random=291, topN=271
+        # threshold=10, k=02,  random=180, topN=217
+        threshold = 5
+        k = 0.1
+
         # Fragmentation penalty with a fixed threshold
-
-        # this results in random 70 topN 140
-        threshold = 5  # Experiment with different values of threshold
-        k = 0.1  # Experiment with different values of k
-
-        # # this results in random -44 topN 44
-        # threshold = 5  # Experiment with different values of threshold
-        # k = 0.2  # Experiment with different values of k
-
-        # # this results in random 291 topN 271
-        # threshold = 10  # Experiment with different values of threshold
-        # k = 0.1  # Experiment with different values of k
-
-        # # this results in random 180 topN 217
-        # threshold = 10  # Experiment with different values of threshold
-        # k = 0.2  # Experiment with different values of k
-
         if chem_frag_count > threshold:
             fragmentation_penalty = k * (chem_frag_count - threshold)
         else:
@@ -635,7 +573,6 @@ class DDAEnv(gym.Env):
         # Calculate the reward_ms2
         reward_ms2 = np.clip(intensity_ratio - fragmentation_penalty, -1, 1)
         return reward_ms2
-
 
     def _compute_intensity_gain_reward(self, chem, chem_frag_int):
         if chem not in self.frag_chem_intensity:

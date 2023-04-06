@@ -167,10 +167,10 @@ class QNetwork(nn.Module):
         super().__init__()
 
         self.n_hidden = [128, 64]
-        self.n_total_features = 547
+        self.n_total_features = 577
         self.n_roi = 30
         self.roi_length = 10
-        self.n_roi_features = self.n_roi * self.roi_length  # 10 rois, each is 30, so total is 300 features
+        self.n_roi_features = self.n_roi * self.roi_length  # 30 rois, each is length 10, so total is 300 features
         self.n_other_features = self.n_total_features - self.n_roi_features  # the remaining, which is 247 features
 
         self.roi_network = nn.Sequential(
@@ -200,13 +200,10 @@ class QNetwork(nn.Module):
     def forward(self, x):
         # transform ROI input to the right shape
         roi_inputs = x[:, 0:self.n_roi_features]
-        roi_img_inputs = roi_inputs.view(-1, self.roi_length, self.n_roi)
-        ndim = roi_img_inputs.ndim
-        roi_img_inputs_transposed = roi_img_inputs.transpose(ndim - 2, ndim - 1)
-        roi_img_inputs_transposed_flipped = torch.flip(roi_img_inputs_transposed, dims=[ndim - 1])
+        roi_img_inputs = roi_inputs.view(-1, self.n_roi, self.roi_length)
 
         # Reshape the tensor to (batch_size * num_roi, 1, num_features)
-        roi_img_inputs_reshaped = roi_img_inputs_transposed_flipped.reshape(-1, 1, self.roi_length)
+        roi_img_inputs_reshaped = roi_img_inputs.reshape(-1, 1, self.roi_length)
 
         # Process each ROI separately
         roi_output = self.roi_network(roi_img_inputs_reshaped)

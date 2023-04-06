@@ -31,95 +31,73 @@ def scale_intensities(intensity_values, num_features, max_value):
     return intensity_values
 
 
+def process_array(arr):
+    # Find the indices of the non-zero elements
+    non_zero_indices = np.where(arr != 0)
+
+    # Compute the log of the non-zero elements
+    log_arr = np.zeros_like(arr, dtype=float)
+    log_arr[non_zero_indices] = np.log(arr[non_zero_indices])
+
+    # Find the maximum log value
+    max_log_value = np.max(log_arr)
+
+    # Divide the log values by the maximum log value
+    log_arr /= max_log_value
+
+    # Clip the results between 0 and 1
+    clipped_arr = np.clip(log_arr, 0, 1)
+
+    return clipped_arr
+
+
+def normalize_roi_data(roi_data):
+    # find the maximum value for each ROI along the timepoint axis
+    max_vals = np.max(roi_data, axis=1)
+
+    # skip any ROIs that are all zeros
+    zero_mask = max_vals != 0
+    roi_data = roi_data[zero_mask]
+    max_vals = max_vals[zero_mask]
+
+    # divide each ROI by its respective maximum value
+    normalized_data = roi_data / max_vals[:, np.newaxis]
+
+    # flip the data, so last column is the most recent ROI point
+    normalized_data = np.flip(normalized_data)
+
+    return normalized_data
+
+
 def update_feature_roi(feature, i, state):
-    # for each feature, get its associated live ROI
-    # there should always be a live ROI for each feature
     roi = feature.roi
 
-    # last few intensity values of this ROI
-    roi_intensities_2 = 0.0
-    roi_intensities_3 = 0.0
-    roi_intensities_4 = 0.0
-    roi_intensities_5 = 0.0
-    roi_intensities_6 = 0.0
-    roi_intensities_7 = 0.0
-    roi_intensities_8 = 0.0
-    roi_intensities_9 = 0.0
+    roi_length = 0.0
+    roi_elapsed_time_since_last_frag = 0.0
+    roi_intensity_at_last_frag = 0.0
+    roi_min_intensity_since_last_frag = 0.0
+    roi_max_intensity_since_last_frag = 0.0
     avg_intensity = 0.0
 
-    # current length of this ROI (in seconds)
-    try:
-        roi_length = clip_value(roi.length_in_seconds, MAX_ROI_LENGTH_SECONDS)
-    except AttributeError:  # no ROI object
-        roi_length = 0.0
-
-    try:
-        # time elapsed (in seconds) since last fragmentation of this ROI
-        val = roi.rt_list[-1] - roi.rt_list[roi.fragmented_index]
-        roi_elapsed_time_since_last_frag = clip_value(np.log(val), MAX_ROI_LENGTH_SECONDS)
-    except AttributeError:  # no ROI object, or never been fragmented
-        roi_elapsed_time_since_last_frag = 0.0
-
-    try:
-        # intensity of this ROI at last fragmentation
-        roi_intensity_at_last_frag = roi.intensity_list[roi.fragmented_index]
-    except AttributeError:  # no ROI object, or never been fragmented
-        roi_intensity_at_last_frag = 0.0
-
-    try:
-        # minimum intensity of this ROI since last fragmentation
-        roi_min_intensity_since_last_frag = min(roi.intensity_list[roi.fragmented_index:])
-    except AttributeError:  # no ROI object, or never been fragmented
-        roi_min_intensity_since_last_frag = 0.0
-
-    try:
-        # maximum intensity of this ROI since last fragmentation
-        roi_max_intensity_since_last_frag = max(roi.intensity_list[roi.fragmented_index:])
-    except AttributeError:  # no ROI object, or never been fragmented
-        roi_max_intensity_since_last_frag = 0.0
-
     if roi is not None:
+        roi_length = clip_value(roi.length_in_seconds, MAX_ROI_LENGTH_SECONDS)
+
+        if hasattr(roi, 'rt_list') and hasattr(roi, 'fragmented_index'):
+            val = roi.rt_list[-1] - roi.rt_list[roi.fragmented_index]
+            roi_elapsed_time_since_last_frag = clip_value(np.log(val), MAX_ROI_LENGTH_SECONDS)
+
+            roi_intensity_at_last_frag = roi.intensity_list[roi.fragmented_index]
+            roi_min_intensity_since_last_frag = min(roi.intensity_list[roi.fragmented_index:])
+            roi_max_intensity_since_last_frag = max(roi.intensity_list[roi.fragmented_index:])
+
         intensities = roi.intensity_list
         avg_intensity = np.mean(intensities)
-        try:
-            roi_intensities_2 = intensities[-2]
-        except IndexError:
-            pass
 
-        try:
-            roi_intensities_3 = intensities[-3]
-        except IndexError:
-            pass
-
-        try:
-            roi_intensities_4 = intensities[-4]
-        except IndexError:
-            pass
-
-        try:
-            roi_intensities_5 = intensities[-5]
-        except IndexError:
-            pass
-
-        try:
-            roi_intensities_6 = intensities[-6]
-        except IndexError:
-            pass
-
-        try:
-            roi_intensities_7 = intensities[-7]
-        except IndexError:
-            pass
-
-        try:
-            roi_intensities_8 = intensities[-8]
-        except IndexError:
-            pass
-
-        try:
-            roi_intensities_9 = intensities[-9]
-        except IndexError:
-            pass
+        for j in range(1, 11):
+            try:
+                state['_roi_intensities'][i][j - 1] = intensities[-j]
+            except IndexError:
+                state['_roi_intensities'][i][j - 1] = 0.0
 
     state['roi_length'][i] = roi_length
     state['roi_elapsed_time_since_last_frag'][i] = roi_elapsed_time_since_last_frag
@@ -127,15 +105,6 @@ def update_feature_roi(feature, i, state):
     state['roi_min_intensity_since_last_frag'][i] = roi_min_intensity_since_last_frag
     state['roi_max_intensity_since_last_frag'][i] = roi_max_intensity_since_last_frag
     state['avg_roi_intensities'][i] = avg_intensity
-
-    state['_roi_intensities_2'][i] = roi_intensities_2
-    state['_roi_intensities_3'][i] = roi_intensities_3
-    state['_roi_intensities_4'][i] = roi_intensities_4
-    state['_roi_intensities_5'][i] = roi_intensities_5
-    state['_roi_intensities_6'][i] = roi_intensities_6
-    state['_roi_intensities_7'][i] = roi_intensities_7
-    state['_roi_intensities_8'][i] = roi_intensities_8
-    state['_roi_intensities_9'][i] = roi_intensities_9
 
 
 def shifted_sigmoid(x, sigmoid_range=2, sigmoid_shift=-1):
@@ -150,3 +119,42 @@ def shifted_sigmoid(x, sigmoid_range=2, sigmoid_shift=-1):
     :return: Transformed sigmoid value
     """
     return (sigmoid_range / (1 + np.exp(-x))) + sigmoid_shift
+
+
+class RoiTracker:
+    def __init__(self, max_rois, num_features):
+        self.max_rois = max_rois
+        self.num_features = num_features
+        self.rois = []
+
+    def update_roi(self, roi):
+        # Update the list of ROIs with new information
+        index = self.get_roi_index(roi.id)
+        if index is None:
+            self.rois.append(roi)
+        else:
+            self.rois[index] = roi
+
+    def get_roi_index(self, roi_id):
+        for index, roi in enumerate(self.rois):
+            if roi.id == roi_id:
+                return index
+        return None
+
+    def select_rois(self):
+        # Implement the selection mechanism based on the criterion of your choice
+        # Example: Select top-N ROIs based on intensity
+        sorted_rois = sorted(self.rois, key=lambda roi: roi.intensity_list[-1], reverse=True)
+        return sorted_rois[:self.max_rois]
+
+    def get_state_matrix(self):
+        selected_rois = self.select_rois()
+        state_matrix = np.zeros((self.max_rois, self.num_features + 1))
+
+        for i, roi in enumerate(selected_rois):
+            roi_features = [roi['id'], roi['intensity'], roi['mz'], roi['rt'],
+                            roi['fragmentation_status']]
+            state_matrix[i, :-1] = roi_features
+            state_matrix[i, -1] = 1  # Set the presence indicator to 1
+
+        return state_matrix
