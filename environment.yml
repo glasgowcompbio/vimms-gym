@@ -21,6 +21,5 @@ dependencies:
     - tensorboard
     - optuna
     - plotly
-    - kaleido
-    - cloudpickle==2.1.0
+    - wandb
     - git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib@feat/gymnasium-support

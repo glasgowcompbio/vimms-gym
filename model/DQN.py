@@ -564,9 +564,9 @@ if __name__ == "__main__":
     args.seed = 42
 
     args.env_id = 'DDAEnv'
-    args.total_timesteps = int(1E6)
+    args.total_timesteps = int(1E5)
     args.learning_rate = 0.0005
-    args.buffer_size = int(5E5)
+    args.buffer_size = int(5E4)
     args.gamma = 0.99
     args.tau = 1.
     args.target_network_frequency = 8000
