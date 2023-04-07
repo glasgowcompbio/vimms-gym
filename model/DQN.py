@@ -173,20 +173,20 @@ class QNetwork(nn.Module):
 
         # configuration 1
 
-        # self.roi_network = nn.Sequential(
-        #     nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3),
-        #     nn.ReLU(),
-        #     nn.MaxPool1d(kernel_size=2),
-        #     nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3),
-        #     nn.ReLU(),
-        #     nn.MaxPool1d(kernel_size=2),
-        #     nn.Flatten(start_dim=1),
-        #     nn.Linear(64, self.n_hidden[1]),
-        #     nn.ReLU(),
-        # )
-        #
-        # output_size = env.single_action_space.n
-        # self.output_layer = nn.Linear(1984, output_size)
+        self.roi_network = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),
+            nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),
+            nn.Flatten(start_dim=1),
+            nn.Linear(64, self.n_hidden[1]),
+            nn.ReLU(),
+        )
+
+        output_size = env.single_action_space.n
+        self.output_layer = nn.Linear(1984, output_size)
 
         # configuration 2
 
@@ -204,17 +204,17 @@ class QNetwork(nn.Module):
 
         # configuration 3
 
-        self.roi_network = nn.Sequential(
-            nn.Conv1d(in_channels=1, out_channels=16, kernel_size=3),
-            nn.ReLU(),
-            nn.AdaptiveMaxPool1d(output_size=4),
-            nn.Flatten(start_dim=1),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-        )
-
-        output_size = env.single_action_space.n
-        self.output_layer = nn.Linear(1024, output_size)
+        # self.roi_network = nn.Sequential(
+        #     nn.Conv1d(in_channels=1, out_channels=16, kernel_size=3),
+        #     nn.ReLU(),
+        #     nn.AdaptiveMaxPool1d(output_size=4),
+        #     nn.Flatten(start_dim=1),
+        #     nn.Linear(64, 32),
+        #     nn.ReLU(),
+        # )
+        #
+        # output_size = env.single_action_space.n
+        # self.output_layer = nn.Linear(1024, output_size)
 
         self.other_network = nn.Sequential(
             nn.Linear(self.n_other_features, self.n_hidden[0]),
