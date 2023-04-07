@@ -1,10 +1,10 @@
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/dqn/#dqnpy
 import argparse
-from datetime import datetime
 import os
 import random
 import socket
 import time
+from datetime import datetime
 from distutils.util import strtobool
 from typing import Callable
 
@@ -15,7 +15,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import wandb
 from gymnasium.utils.env_checker import check_env
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
@@ -161,7 +160,6 @@ def make_env(env_id, seed, max_peaks, params):
 #         return q_values
 
 
-# ALGO LOGIC: initialize agent here:
 class QNetwork(nn.Module):
     def __init__(self, env):
         super().__init__()
@@ -173,17 +171,50 @@ class QNetwork(nn.Module):
         self.n_roi_features = self.n_roi * self.roi_length  # 30 rois, each is length 10, so total is 300 features
         self.n_other_features = self.n_total_features - self.n_roi_features  # the remaining, which is 247 features
 
+        # configuration 1
+
+        # self.roi_network = nn.Sequential(
+        #     nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3),
+        #     nn.ReLU(),
+        #     nn.MaxPool1d(kernel_size=2),
+        #     nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3),
+        #     nn.ReLU(),
+        #     nn.MaxPool1d(kernel_size=2),
+        #     nn.Flatten(start_dim=1),
+        #     nn.Linear(64, self.n_hidden[1]),
+        #     nn.ReLU(),
+        # )
+        #
+        # output_size = env.single_action_space.n
+        # self.output_layer = nn.Linear(1984, output_size)
+
+        # configuration 2
+
+        # self.roi_network = nn.Sequential(
+        #     nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3),
+        #     nn.ReLU(),
+        #     nn.MaxPool1d(kernel_size=2),
+        #     nn.Flatten(start_dim=1),
+        #     nn.Linear(self.n_hidden[0], self.n_hidden[1]),
+        #     nn.ReLU(),
+        # )
+        #
+        # output_size = env.single_action_space.n
+        # self.output_layer = nn.Linear(1984, output_size)
+
+        # configuration 3
+
         self.roi_network = nn.Sequential(
-            nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3),
+            nn.Conv1d(in_channels=1, out_channels=16, kernel_size=3),
             nn.ReLU(),
-            nn.MaxPool1d(kernel_size=2),
-            nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3),
-            nn.ReLU(),
-            nn.MaxPool1d(kernel_size=2),
+            nn.AdaptiveMaxPool1d(output_size=4),
             nn.Flatten(start_dim=1),
-            nn.Linear(64, self.n_hidden[1]),
+            nn.Linear(64, 32),
             nn.ReLU(),
         )
+
+        output_size = env.single_action_space.n
+        self.output_layer = nn.Linear(1024, output_size)
 
         self.other_network = nn.Sequential(
             nn.Linear(self.n_other_features, self.n_hidden[0]),
@@ -194,11 +225,12 @@ class QNetwork(nn.Module):
             nn.ReLU(),
         )
 
-        output_size = env.single_action_space.n
-        self.output_layer = nn.Linear(1984, output_size)
-
     def forward(self, x):
-        # transform ROI input to the right shape
+        # get dense network prediction for other features
+        other_inputs = x[:, self.n_roi_features:]
+        other_output = self.other_network(other_inputs)
+
+        # transform ROI input to the right shape: (self.n_roi, self.roi_length)
         roi_inputs = x[:, 0:self.n_roi_features]
         roi_img_inputs = roi_inputs.view(-1, self.n_roi, self.roi_length)
 
@@ -208,15 +240,10 @@ class QNetwork(nn.Module):
         # Process each ROI separately
         roi_output = self.roi_network(roi_img_inputs_reshaped)
 
-        # Reshape the output back to (batch_size, num_roi * hidden_size)
-        roi_output = roi_output.view(-1, self.n_hidden[1] * self.n_roi)
-
-        other_inputs = x[:, self.n_roi_features:]
-        other_output = self.other_network(other_inputs)
+        # Reshape the output back to match the dense output
+        roi_output = roi_output.view(other_output.shape[0], -1)
 
         # Concatenate the outputs of the two networks
-        # print("roi_output shape:", roi_output.shape)
-        # print("other_output shape:", other_output.shape)
         combined_output = torch.cat((roi_output, other_output), dim=-1)
 
         # Generate Q-value predictions
