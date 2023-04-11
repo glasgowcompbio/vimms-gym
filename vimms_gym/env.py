@@ -534,11 +534,13 @@ class DDAEnv(gym.Env):
         intensity_ratio = chem_frag_int / chem.max_intensity
 
         # some experiments with different values:
+        # threshold=1, k=0.1, random=-220, topN=-103
+        # threshold=3, k=0.1, random=-34, topN=51
         # threshold=5,  k=0.1, random=70,  topN=140
         # threshold=5,  k=0.2, random=-44, topN=44
         # threshold=10, k=0.1, random=291, topN=271
         # threshold=10, k=02,  random=180, topN=217
-        threshold = 5
+        threshold = 3
         k = 0.1
 
         # Fragmentation penalty with a fixed threshold
