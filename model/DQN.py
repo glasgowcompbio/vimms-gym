@@ -165,7 +165,7 @@ class QNetwork(nn.Module):
         super().__init__()
 
         self.n_hidden = [128, 64]
-        self.n_total_features = 577
+        self.n_total_features = 427
         self.n_roi = 30
         self.roi_length = 10
         self.n_roi_features = self.n_roi * self.roi_length  # 30 rois, each is length 10, so total is 300 features

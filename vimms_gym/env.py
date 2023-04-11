@@ -87,15 +87,6 @@ class DDAEnv(gym.Env):
             # roi features
             'roi_length': spaces.Box(
                 low=0, high=1, shape=(self.max_peaks,)),
-            'roi_elapsed_time_since_last_frag': spaces.Box(
-                low=0, high=1, shape=(self.max_peaks,)),
-            'roi_intensity_at_last_frag': spaces.Box(
-                low=lo, high=hi, shape=(self.max_peaks,)),
-            'roi_min_intensity_since_last_frag': spaces.Box(
-                low=lo, high=hi, shape=(self.max_peaks,)),
-            'roi_max_intensity_since_last_frag': spaces.Box(
-                low=lo, high=hi, shape=(self.max_peaks,)),
-            'avg_roi_intensities': spaces.Box(low=lo, high=hi, shape=(self.max_peaks,)),
 
             # roi intensity features
             '_roi_intensities': spaces.Box(low=lo, high=hi, shape=(
@@ -127,11 +118,6 @@ class DDAEnv(gym.Env):
 
             # roi features
             'roi_length': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_elapsed_time_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_intensity_at_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_min_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            'roi_max_intensity_since_last_frag': np.zeros(self.max_peaks, dtype=np.float32),
-            'avg_roi_intensities': np.zeros(self.max_peaks, dtype=np.float32),
 
             # roi intensity features
             '_roi_intensities': np.zeros((self.max_peaks, self.num_roi_features),
@@ -241,15 +227,6 @@ class DDAEnv(gym.Env):
             if f.intensity < self.min_ms1_intensity:
                 state['valid_actions'][i] = 0  # except when it's below min ms1 intensity
             update_feature_roi(f, i, state)  # update ROI information for this feature
-
-        state['roi_intensity_at_last_frag'] = scale_intensities(
-            state['roi_intensity_at_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_min_intensity_since_last_frag'] = scale_intensities(
-            state['roi_min_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['roi_max_intensity_since_last_frag'] = scale_intensities(
-            state['roi_max_intensity_since_last_frag'], num_features, MAX_OBSERVED_LOG_INTENSITY)
-        state['avg_roi_intensities'] = scale_intensities(
-            state['avg_roi_intensities'], num_features, MAX_OBSERVED_LOG_INTENSITY)
 
         state['_roi_intensities'] = normalize_roi_data(state['_roi_intensities'])
 
