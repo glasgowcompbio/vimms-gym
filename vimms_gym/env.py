@@ -529,9 +529,10 @@ class DDAEnv(gym.Env):
         reward = 1 - np.exp(-alpha * x)
         return reward
 
-    def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, current_rt, feature):
+    def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, chem_frag_time, feature):
 
         intensity_ratio = chem_frag_int / chem.max_intensity
+        apex_reward = self._compute_apex_reward(chem, chem_frag_time)
 
         # some experiments with different values:
         # threshold=1, k=0.1, random=-220, topN=-103
@@ -550,7 +551,7 @@ class DDAEnv(gym.Env):
             fragmentation_penalty = 0
 
         # Calculate the reward_ms2
-        reward_ms2 = np.clip(intensity_ratio - fragmentation_penalty, -1, 1)
+        reward_ms2 = np.clip(apex_reward - fragmentation_penalty, -1, 1)
         return reward_ms2
 
     def _compute_intensity_gain_reward(self, chem, chem_frag_int):
