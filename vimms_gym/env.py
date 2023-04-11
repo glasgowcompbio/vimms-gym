@@ -94,7 +94,7 @@ class DDAEnv(gym.Env):
 
             # valid action indicators, last action and current ms level
             'valid_actions': spaces.MultiBinary(self.in_dim),
-            'last_action': spaces.Discrete(self.in_dim + 1),
+            'last_action': spaces.Discrete(self.in_dim),
             'ms_level': spaces.Discrete(2),  # either MS1 or MS2 scans
 
             # various other counts
