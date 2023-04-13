@@ -540,7 +540,7 @@ class DDAEnv(gym.Env):
         # threshold=5,  k=0.2, random=-44, topN=44
         # threshold=10, k=0.1, random=291, topN=271
         # threshold=10, k=02,  random=180, topN=217
-        threshold = 3
+        threshold = 5
         k = 0.1
 
         # Fragmentation penalty with a fixed threshold
