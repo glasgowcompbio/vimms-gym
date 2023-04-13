@@ -293,7 +293,8 @@ def main(args):
                       gym.spaces.Discrete), "only discrete action space is supported"
 
     q_network = QNetwork(envs).to(device)
-    optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
+    optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate,
+                           weight_decay=args.weight_decay)
     target_network = QNetwork(envs).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
@@ -508,6 +509,7 @@ if __name__ == "__main__":
     args.env_id = 'DDAEnv'
     args.total_timesteps = int(1E5)
     args.learning_rate = 0.0005
+    args.weight_decay = 0.0001
     args.buffer_size = int(5E4)
     args.gamma = 0.99
     args.tau = 1.
