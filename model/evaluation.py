@@ -28,7 +28,7 @@ def evaluate_model(
     model.eval()
 
     # load evaluation dataset
-    chem_path = os.path.join('..', 'notebooks', 'QCB_resimulated_medium', 'QCB_chems_medium.p')
+    chem_path = os.path.join('notebooks', 'QCB_resimulated_medium', 'QCB_chems_medium.p')
     chem_list = load_obj(chem_path)
     episodic_returns = []
     evaluation_results = []
