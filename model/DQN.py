@@ -1,3 +1,6 @@
+import sys
+sys.path.append('..')
+
 import argparse
 import os
 import random
@@ -14,13 +17,14 @@ from gymnasium.utils.env_checker import check_env
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 
-from model.DQN_utils import set_torch_threads, masked_epsilon_greedy, get_action_masks_from_obs
-from model.QNetwork import QNETWORK_CNN, get_QNetwork
-from model.evaluation import evaluate_model
 from vimms_gym.common import METHOD_DQN
 from vimms_gym.env import DDAEnv
 from vimms_gym.experiments import preset_qcb_medium
 from vimms_gym.wrappers import custom_flatten_dict_observations
+
+from DQN_utils import set_torch_threads, masked_epsilon_greedy, get_action_masks_from_obs
+from QNetwork import QNETWORK_CNN, get_QNetwork
+from evaluation import evaluate_model
 
 
 def parse_args():

@@ -1,16 +1,19 @@
+import sys
+sys.path.append('..')
+
 import os
 from typing import Callable
 
 import gymnasium as gym
 import pandas as pd
 import torch
+
 from vimms.Common import load_obj
 from vimms.Evaluation import EvaluationData
-
-from model.DQN_utils import masked_epsilon_greedy
 from vimms_gym.common import METHOD_DQN, evaluate
 from vimms_gym.experiments import preset_qcb_medium
 
+from DQN_utils import masked_epsilon_greedy
 
 def evaluate_model(
         model_path: str,

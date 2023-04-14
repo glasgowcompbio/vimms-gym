@@ -15,7 +15,7 @@ import torch.optim as optim
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 
-from model.identity_env import IdentityEnv, IdentityEnvDiscrete
+from identity_env import IdentityEnv, IdentityEnvDiscrete
 
 
 def parse_args():
