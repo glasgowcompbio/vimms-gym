@@ -1,8 +1,33 @@
 import random
 import socket
 
+import gymnasium as gym
 import numpy as np
 import torch
+from gymnasium.utils.env_checker import check_env
+
+from vimms_gym.env import DDAEnv
+from vimms_gym.wrappers import custom_flatten_dict_observations
+
+
+def make_env(env_id, seed, max_peaks, params):
+    def thunk():
+        env = DDAEnv(max_peaks, params)
+        check_env(env)
+        env = custom_flatten_dict_observations(env)
+
+        env.reset(seed=seed)
+        env = gym.wrappers.RecordEpisodeStatistics(env)
+        env.action_space.seed(seed)
+        env.observation_space.seed(seed)
+        return env
+
+    return thunk
+
+
+def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
+    slope = (end_e - start_e) / duration
+    return max(slope * t + start_e, end_e)
 
 
 def get_action_masks_from_obs(obs, max_peaks):

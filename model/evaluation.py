@@ -1,6 +1,3 @@
-import sys
-sys.path.append('..')
-
 import os
 from typing import Callable
 
@@ -13,7 +10,7 @@ from vimms.Evaluation import EvaluationData
 from vimms_gym.common import METHOD_DQN, evaluate
 from vimms_gym.experiments import preset_qcb_medium
 
-from DQN_utils import masked_epsilon_greedy
+from model.DQN_utils import masked_epsilon_greedy
 
 def evaluate_model(
         model_path: str,
@@ -86,7 +83,7 @@ def evaluate_model(
     pd.set_option('display.max_columns', None)
     df_summary = df.describe(include='all')
     print(df_summary)
-    df_summary.to_csv('df_summary.tsv', sep='\t')
-    df.to_csv('df.tsv', sep='\t')
+    # df_summary.to_csv('df_summary.tsv', sep='\t')
+    # df.to_csv('df.tsv', sep='\t')
 
     return episodic_returns, df, df_summary

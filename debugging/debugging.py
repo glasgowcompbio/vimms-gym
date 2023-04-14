@@ -19,7 +19,7 @@ from vimms.Evaluation import EvaluationData
 from vimms_gym.env import DDAEnv
 from vimms_gym.common import EVAL_METRIC_REWARD, HISTORY_HORIZON, evaluate
 
-from tune import TrialEvalCallback
+from sb_tune import TrialEvalCallback
 from vimms_gym.experiments import preset_qcb_small
 
 def debug_run(fname, max_peaks, params, n_eval_episodes=1, deterministic=True):
