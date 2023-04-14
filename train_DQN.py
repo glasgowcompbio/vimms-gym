@@ -25,7 +25,7 @@ from vimms_gym.experiments import preset_qcb_medium
 def parse_args():
     # fmt: off
     parser = argparse.ArgumentParser()
-    parser.add_argument("--exp-name", type=str, default=os.path.basename(__file__).rstrip(".py"),
+    parser.add_argument("--exp-name", type=str, default="DQN",
                         help="the name of this experiment")
     parser.add_argument("--seed", type=int, default=42,
                         help="seed of the experiment")
@@ -83,8 +83,8 @@ def parse_args():
 
 
 def main(args):
-    current_time = datetime.now().strftime('DDAENv_DQN_%Y%m%d_%H%M%S')
-    run_name = f"{args.env_id}__{args.exp_name}__{current_time}"
+    current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
+    run_name = f"{args.env_id}_{args.exp_name}_{current_time}"
     if args.track:
         import wandb
 
