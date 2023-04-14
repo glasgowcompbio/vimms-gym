@@ -104,7 +104,7 @@ def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
 
 
 def main(args):
-    current_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    current_time = datetime.now().strftime('DDAENv_DQN_%Y%m%d_%H%M%S')
     run_name = f"{args.env_id}__{args.exp_name}__{current_time}"
     if args.track:
         import wandb
