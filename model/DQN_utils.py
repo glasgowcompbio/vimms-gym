@@ -69,7 +69,7 @@ def masked_greedy(device, masks, obs, q_network):
 
 def masked_epsilon(masks):
     # masked epsilon move
-    valid_actions = np.argwhere(masks == 1).flatten()
+    valid_actions = np.flatnonzero(masks)
     actions = np.array([np.random.choice(valid_actions)])
     return actions
 
