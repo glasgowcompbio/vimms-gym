@@ -19,7 +19,8 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, RENDER_HUMAN, RENDER_RGB_ARRAY, \
     render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, CLIPPED_INTENSITY_LOW, \
-    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA
+    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA, \
+    evaluate, EVAL_F1_INTENSITY_THRESHOLD, simple_evaluate
 from vimms_gym.env_utils import scale_intensities, update_feature_roi, RoiTracker, \
     normalize_roi_data
 from vimms_gym.features import CleanerTopNExclusion, Feature
@@ -346,6 +347,7 @@ class DDAEnv(gym.Env):
         self.frag_chem_intensity = {}
         self.frag_chem_time = {}
         self.frag_chem_count = defaultdict(int)
+        self.last_res = 0
 
         # needed for SubprocVecEnv
         set_log_level_warning()
@@ -475,126 +477,12 @@ class DDAEnv(gym.Env):
             self.invalid_action_count += 1
         else:
 
-            if dda_action.ms_level == 1:
-                # compute ms1 reward
-                num_total = len(self.features)
-                reward = self._compute_ms1_reward(self.num_fragmented, num_total, MS1_REWARD_SHAPE)
-
-            elif dda_action.ms_level == 2:
-                if frag_events is not None:  # some chemical has been fragmented
-
-                    # TODO: assume only 1 chemical has been fragmented
-                    # works for DDA but not for DIA
-                    frag_event = frag_events[0]
-                    chem_frag_int = frag_event.parents_intensity[0]
-
-                    # look up previous fragmented intensity for this chem
-                    chem = frag_event.chem
-                    self.frag_chem_count[chem] += 1
-                    chem_frag_count = self.frag_chem_count[chem]
-
-                    # compute ms2 reward
-                    feature = self.features[dda_action.idx]
-                    reward = self._compute_ms2_reward(chem, chem_frag_int, chem_frag_count,
-                                                      frag_event.query_rt, feature)
-
-                    # store new intensity and frag time into dictionaries
-                    self.frag_chem_intensity[chem] = chem_frag_int
-                    self.frag_chem_time[chem] = frag_event.query_rt
-
-                else:
-                    # fragmenting a spike noise, or no chem associated with this, so we give no reward
-                    reward = 0.0
+            res = simple_evaluate(self, intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD)
+            if res > self.last_res:
+                reward = res - self.last_res
+                self.last_res = res
 
         assert -1 <= reward <= 1
-        return reward
-
-    def _compute_ms1_reward(self, num_fragmented, num_total, alpha):
-        """
-        Calculate the MS1 reward based on the number of precursor ions that have
-        been fragmented, using a decreasing exponential function. The reward
-        assigns more weight to early fragmented ions and gradually decreases the
-        weight for later ones.
-
-        Args:
-            num_fragmented (int): The number of fragmented precursor ions.
-            num_total (int): The total number of precursor ions in the scan.
-            alpha (float): A scaling parameter controlling the reward function shape.
-
-        Returns:
-            float: The MS1 reward in the range [0, 1].
-        """
-
-        x = num_fragmented / num_total
-        reward = 1 - np.exp(-alpha * x)
-        return reward
-
-    def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, current_rt, feature):
-
-        intensity_ratio = chem_frag_int / chem.max_intensity
-
-        # some experiments with different values:
-        # threshold=1, k=0.1, random=-220, topN=-103
-        # threshold=3, k=0.1, random=-34, topN=51
-        # threshold=5,  k=0.1, random=70,  topN=140
-        # threshold=5,  k=0.2, random=-44, topN=44
-        # threshold=10, k=0.1, random=291, topN=271
-        # threshold=10, k=02,  random=180, topN=217
-        threshold = 5
-        k = 0.1
-
-        # Fragmentation penalty with a fixed threshold
-        if chem_frag_count > threshold:
-            fragmentation_penalty = k * (chem_frag_count - threshold)
-        else:
-            fragmentation_penalty = 0
-
-        # Calculate the reward_ms2
-        reward_ms2 = np.clip(intensity_ratio - fragmentation_penalty, -1, 1)
-        return reward_ms2
-
-    def _compute_intensity_gain_reward(self, chem, chem_frag_int):
-        if chem not in self.frag_chem_intensity:
-            # First fragmentation of this ion, maximum information gain
-            return 1.0
-
-        log_chem_frag_int = np.log(chem_frag_int)
-        log_last_frag_int = np.log(self.frag_chem_intensity[chem])
-        intensity_difference = abs(log_chem_frag_int - log_last_frag_int)
-        intensity_gain = intensity_difference / max(log_chem_frag_int, log_last_frag_int)
-        return np.clip(intensity_gain, 0, 1)
-
-    def _compute_apex_reward(self, chem, frag_time, scaling_factor=10.0):
-        """
-        Compute the apex reward for a given chromatogram and relative fragmentation time.
-        The apex reward is based on the distance between the relative fragmentation time and the
-        apex time of the chromatogram, normalized by the chromatogram's retention time range.
-        The closer the relative fragmentation time is to the apex time, the higher the reward.
-
-        Args:
-            chrom: The chromatogram of the chemical.
-            frag_time: The fragmentation time.
-            scaling_factor: A positive scaling factor controlling the penalty for suboptimal fragmentation times.
-
-        Returns:
-            float: The apex reward, in the range [0, 1].
-        """
-        rel_frag_time = frag_time - chem.rt
-        chrom = chem.chromatogram
-        min_rt = chrom.min_rt
-        max_rt = chrom.max_rt
-        apex_time = chrom.get_apex_rt()
-        normalized_frag_time = (rel_frag_time - min_rt) / (max_rt - min_rt)
-        normalized_apex_time = (apex_time - min_rt) / (max_rt - min_rt)
-        apex_reward = self.apex_reward(normalized_frag_time, normalized_apex_time,
-                                       scaling_factor)
-        return apex_reward
-
-    def apex_reward(self, frag_time, apex_time, scaling_factor):
-        distance = abs(frag_time - apex_time)
-        reward = 1 - distance
-        # reward = 1 - distance ** 2
-        # reward = 1 - np.exp(-scaling_factor * distance)
         return reward
 
     def reset(self, seed=None, options=None):
