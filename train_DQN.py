@@ -145,6 +145,7 @@ def main(args):
     total_returns = []
     obs, _ = envs.reset()
     total_timesteps = int(args.total_timesteps)
+    start_time = time.time()
     for global_step in range(total_timesteps):
         # ALGO LOGIC: put action logic here
         epsilon = linear_schedule(args.start_e, args.end_e,
@@ -169,8 +170,10 @@ def main(args):
                 episodic_return = info['episode']['r'][0]
                 episodic_length = info['episode']['l'][0]
                 total_returns.append(episodic_return)
+                elapsed_time = time.time() - start_time
                 print(f"global_step={global_step}, episodic_return={episodic_return}, "
-                      f"episodic_length={episodic_length}")
+                      f"episodic_length={episodic_length} elapsed={elapsed_time}s")
+                start_time = time.time()
                 writer.add_scalar("charts/episodic_return", episodic_return, global_step)
                 writer.add_scalar("charts/episodic_length", episodic_length, global_step)
                 writer.add_scalar("charts/epsilon", epsilon, global_step)
