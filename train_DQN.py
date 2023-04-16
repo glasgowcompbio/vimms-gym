@@ -7,12 +7,12 @@ from datetime import datetime
 from distutils.util import strtobool
 
 import gymnasium as gym
-import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 
 from model.DQN_utils import set_torch_threads, masked_epsilon_greedy, get_action_masks_from_obs, \
     make_env, linear_schedule
