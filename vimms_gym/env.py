@@ -19,9 +19,9 @@ from vimms_gym.agents import DataDependantAcquisitionAgent, DataDependantAction
 from vimms_gym.chemicals import generate_chemicals
 from vimms_gym.common import clip_value, INVALID_MOVE_REWARD, RENDER_HUMAN, RENDER_RGB_ARRAY, \
     render_scan, ALPHA, BETA, NO_FRAGMENTATION_REWARD, CLIPPED_INTENSITY_LOW, \
-    CLIPPED_INTENSITY_HIGH, MAX_OBSERVED_LOG_INTENSITY, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA
-from vimms_gym.env_utils import scale_intensities, update_feature_roi, RoiTracker, \
-    normalize_roi_data
+    CLIPPED_INTENSITY_HIGH, MS1_REWARD_SHAPE, SKIP_MS2_SPECTRA
+from vimms_gym.env_utils import update_feature_roi, RoiTracker, \
+    normalize_roi_data, extract_value
 from vimms_gym.features import CleanerTopNExclusion, Feature
 
 
@@ -357,6 +357,9 @@ class DDAEnv(gym.Env):
         """
         self.step_no += 1
         info = {}
+
+        # parallel environments could pass action as a one-element numpy array
+        action = extract_value(action)
 
         # get next scan and next state
         next_scan, episode_done, dda_action, is_valid = self._one_step(
