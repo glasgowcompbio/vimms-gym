@@ -114,10 +114,10 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     # env setup
-    NUM_ENVS = 1
+    NUM_ENVS = 20
     params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
                                           extract_chromatograms=True)
-    envs = gym.vector.SyncVectorEnv(
+    envs = gym.vector.AsyncVectorEnv(
         [make_env(args.env_id, args.seed + i, max_peaks, params) for i in range(NUM_ENVS)])
     assert isinstance(envs.single_action_space,
                       gym.spaces.Discrete), "only discrete action space is supported"
@@ -129,7 +129,7 @@ def main(args):
     target_network.load_state_dict(q_network.state_dict())
 
     # TODO: ReplayBuffer only supports a single environment for now
-    assert NUM_ENVS == 1
+    # assert NUM_ENVS == 1
     buffer_size = int(args.buffer_size)
     rb = ReplayBuffer(
         buffer_size,
@@ -138,6 +138,7 @@ def main(args):
         device,
         optimize_memory_usage=True,
         handle_timeout_termination=False,
+        n_envs=NUM_ENVS
     )
     start_time = time.time()
 
@@ -166,7 +167,8 @@ def main(args):
         if 'final_info' in infos:
             final_infos = infos['final_info']
             for info in final_infos:
-                idx = 0
+                if info is None:
+                    continue
                 episodic_return = info['episode']['r'][0]
                 episodic_length = info['episode']['l'][0]
                 total_returns.append(episodic_return)
@@ -177,13 +179,13 @@ def main(args):
                 writer.add_scalar("charts/episodic_return", episodic_return, global_step)
                 writer.add_scalar("charts/episodic_length", episodic_length, global_step)
                 writer.add_scalar("charts/epsilon", epsilon, global_step)
-                break
 
         # TRY NOT TO MODIFY: save data to reply buffer; handle `terminal_observation`
         real_next_obs = next_obs.copy()
         for idx, d in enumerate(dones):
             if d:
                 real_next_obs[idx] = infos["final_observation"][idx]
+            # rb.add(obs[idx], real_next_obs[idx], actions[idx], rewards[idx], dones[idx], [])
         rb.add(obs, real_next_obs, actions, rewards, dones, infos)
 
         # TRY NOT TO MODIFY: CRUCIAL step easy to overlook

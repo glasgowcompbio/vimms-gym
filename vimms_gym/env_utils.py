@@ -142,3 +142,12 @@ class RoiTracker:
             state_matrix[i, -1] = 1  # Set the presence indicator to 1
 
         return state_matrix
+
+
+def extract_value(variable):
+    if isinstance(variable, np.int64):
+        return variable
+    elif isinstance(variable, np.ndarray) and len(variable) == 1:
+        return variable[0]
+    else:
+        return "Unexpected variable type or array length"

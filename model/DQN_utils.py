@@ -62,17 +62,27 @@ def masked_greedy(device, masks, obs, q_network):
     # masked greedy move
     q_values_np = q_values.detach().cpu().numpy()
     min_value = float('-inf')
-    masked_q_values_np = np.where(masks, q_values_np, min_value)
-    actions = np.array([np.argmax(masked_q_values_np)])
+    masked_q_values_np = q_values_np.copy()
+    masked_q_values_np[~masks] = min_value
+    actions = np.argmax(masked_q_values_np, axis=1).reshape(-1, 1)  # reshape for Nx1
+
     return actions
 
 
 def masked_epsilon(masks):
     # masked epsilon move
-    valid_actions = np.flatnonzero(masks)
-    actions = np.array([np.random.choice(valid_actions)])
+    actions = select_random_true_positions(masks)
     return actions
 
+
+def select_random_true_positions(mask):
+    selected_positions = np.zeros(mask.shape[0], dtype=int)
+
+    for idx, row in enumerate(mask):
+        true_positions = np.where(row)[0]  # Get the indices where value is True
+        selected_positions[idx] = np.random.choice(true_positions)  # Randomly select one of the True positions
+
+    return selected_positions.reshape(-1, 1)  # reshape for mask.shape[0]x1
 
 def epsilon_greedy(device, env, epsilon, obs, q_network):
     if random.random() < epsilon:
