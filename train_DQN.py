@@ -45,6 +45,11 @@ def parse_args():
     parser.add_argument("--save-model", type=lambda x: bool(strtobool(x)), default=True,
                         nargs="?", const=True,
                         help="whether to save model into the `runs/{run_name}` folder")
+    parser.add_argument("--num-envs", type=int, default=1,
+                        help="the number of environments")
+    parser.add_argument("--env-type", type=str, default="sync",
+                        choices=["async", "sync"],
+                        help="the type of environment (async or sync)")
 
     # Algorithm specific arguments
     parser.add_argument("--env-id", type=str, default="DDAEnv",
@@ -114,11 +119,16 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     # env setup
-    NUM_ENVS = 20
+    num_envs = args.num_envs
     params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
                                           extract_chromatograms=True)
-    envs = gym.vector.AsyncVectorEnv(
-        [make_env(args.env_id, args.seed + i, max_peaks, params) for i in range(NUM_ENVS)])
+    if args.env_type == 'async':
+        envs = gym.vector.AsyncVectorEnv(
+            [make_env(args.env_id, args.seed + i, max_peaks, params) for i in range(num_envs)])
+    else:  # sync
+        envs = gym.vector.SyncVectorEnv(
+            [make_env(args.env_id, args.seed + i, max_peaks, params) for i in range(num_envs)])
+
     assert isinstance(envs.single_action_space,
                       gym.spaces.Discrete), "only discrete action space is supported"
 
@@ -138,7 +148,7 @@ def main(args):
         device,
         optimize_memory_usage=True,
         handle_timeout_termination=False,
-        n_envs=NUM_ENVS
+        n_envs=num_envs
     )
     start_time = time.time()
 
