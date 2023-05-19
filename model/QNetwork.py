@@ -178,9 +178,9 @@ class QNetworkLSTM(nn.Module):
 
         # LSTM for processing ROIs
         self.roi_lstm = nn.LSTM(input_size=1, hidden_size=self.lstm_size,
-                                num_layers=1, batch_first=True)
+                                num_layers=1, batch_first=True, bidirectional=True)
         self.roi_fc = nn.Sequential(
-            nn.Linear(lstm_size, lstm_fc_size),
+            nn.Linear(lstm_size*2, lstm_fc_size),
             nn.ReLU(),
         )
 
@@ -234,8 +234,15 @@ class QNetworkLSTM(nn.Module):
         # Not necessary since we don't use lstm_outs, only h_t
         # lstm_outs, _ = nn.utils.rnn.pad_packed_sequence(lstm_outs)
 
+        # take the last hidden state from forward direction, and from backward direction
+        h_t_forward = h_t[-2, :, :]
+        h_t_backward = h_t[-1, :, :]
+        h_t_combined = torch.cat((h_t_forward, h_t_backward), dim=-1) # concat along the last dim
+
+        # reshape for roi_fc
+        h_t_reshaped = h_t_combined.view(-1, self.lstm_size * 2)  # notice the lstm_size * 2
+
         # Pass LSTM output through a fully connected layer
-        h_t_reshaped = h_t.reshape(-1, h_t.shape[2])
         roi_output = self.roi_fc(h_t_reshaped)
 
         # Reshape the ROI output to have the same number of samples as the input
