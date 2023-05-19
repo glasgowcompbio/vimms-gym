@@ -7,12 +7,12 @@ from datetime import datetime
 from distutils.util import strtobool
 
 import gymnasium as gym
-import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 
 from model.DQN_utils import set_torch_threads, masked_epsilon_greedy, get_action_masks_from_obs, \
     make_env, linear_schedule
@@ -156,6 +156,7 @@ def main(args):
     total_returns = []
     obs, _ = envs.reset()
     total_timesteps = int(args.total_timesteps)
+    start_time = time.time()
     for global_step in range(total_timesteps):
         # ALGO LOGIC: put action logic here
         epsilon = linear_schedule(args.start_e, args.end_e,
@@ -181,8 +182,10 @@ def main(args):
                 episodic_return = info['episode']['r'][0]
                 episodic_length = info['episode']['l'][0]
                 total_returns.append(episodic_return)
+                elapsed_time = time.time() - start_time
                 print(f"global_step={global_step}, episodic_return={episodic_return}, "
-                      f"episodic_length={episodic_length}")
+                      f"episodic_length={episodic_length} elapsed={elapsed_time}s")
+                start_time = time.time()
                 writer.add_scalar("charts/episodic_return", episodic_return, global_step)
                 writer.add_scalar("charts/episodic_length", episodic_length, global_step)
                 writer.add_scalar("charts/epsilon", epsilon, global_step)

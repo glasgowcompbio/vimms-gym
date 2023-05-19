@@ -2,9 +2,9 @@ import random
 import socket
 
 import gymnasium as gym
-import numpy as np
 import torch
 from gymnasium.utils.env_checker import check_env
+import numpy as np
 
 from vimms_gym.env import DDAEnv
 from vimms_gym.wrappers import custom_flatten_dict_observations

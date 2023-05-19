@@ -1,6 +1,6 @@
-import numpy as np
 import torch
 import torch.nn as nn
+import numpy as np
 
 QNETWORK_CNN = 'CNN'
 QNETWORK_LSTM = 'LSTM'
@@ -229,7 +229,7 @@ class QNetworkLSTM(nn.Module):
         h_c = torch.zeros((first_dim, batch_size * self.n_roi, self.lstm_size), device=device)
 
         # Process ROIs with LSTM
-        lstm_outs, (h_t, h_c) = self.roi_lstm(lstm_input, (h_t, h_c))
+        lstm_outs, (h_t, h_c) = self.roi_lstm(lstm_input, (h_t.detach(), h_c.detach()))
 
         # Not necessary since we don't use lstm_outs, only h_t
         # lstm_outs, _ = nn.utils.rnn.pad_packed_sequence(lstm_outs)
