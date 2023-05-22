@@ -211,14 +211,18 @@ def main(args):
                     x = data.next_observations.float()
                     action_masks = get_action_masks_from_obs(x, max_peaks)
 
-                    # Apply the mask to the target network's output
-                    target_q_values = target_network(x)
+                    # Apply the mask to the online network's output to get best action
+                    online_q_values = q_network(x)
                     min_value = float('-inf')
-                    masked_target_q_values = torch.where(action_masks, target_q_values,
+                    masked_online_q_values = torch.where(action_masks, online_q_values,
                                                          torch.tensor(min_value).to(x.device))
-                    target_max, _ = masked_target_q_values.max(dim=1)
+                    online_actions = masked_online_q_values.argmax(dim=1).unsqueeze(1)
 
-                    td_target = data.rewards.flatten() + args.gamma * target_max * (
+                    # Use the selected actions to get Q-values from the target network
+                    target_q_values = target_network(x)
+                    masked_target_q_values = target_q_values.gather(1, online_actions)
+
+                    td_target = data.rewards.flatten() + args.gamma * masked_target_q_values.flatten() * (
                             1 - data.dones.flatten())
 
                 x = data.observations.float()
