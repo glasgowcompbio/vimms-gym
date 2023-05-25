@@ -147,7 +147,8 @@ class RoiTracker:
 def extract_value(variable):
     if isinstance(variable, np.int64):
         return variable
+    elif isinstance(variable, int):
+        return variable
     elif isinstance(variable, np.ndarray) and len(variable) == 1:
         return variable[0]
-    else:
-        return "Unexpected variable type or array length"
+    raise ValueError('Unexpected variable type')
