@@ -87,6 +87,156 @@ def parse_args():
     return args
 
 
+def training_loop(seed, torch_deterministic, num_envs, env_type, env_id,
+                  qnetwork, learning_rate, weight_decay, buffer_size, total_timesteps,
+                  start_e, end_e, exploration_fraction, learning_starts, train_frequency,
+                  batch_size, gamma, target_network_frequency, tau,
+                  device, writer):
+
+    # TRY NOT TO MODIFY: seeding
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = torch_deterministic
+
+    # env setup
+    params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
+                                          extract_chromatograms=True)
+    if env_type == 'async':
+        envs = gym.vector.AsyncVectorEnv(
+            [make_env(env_id, seed + i, max_peaks, params) for i in range(num_envs)])
+    else:  # sync
+        envs = gym.vector.SyncVectorEnv(
+            [make_env(env_id, seed + i, max_peaks, params) for i in range(num_envs)])
+    assert isinstance(envs.single_action_space,
+                      gym.spaces.Discrete), "only discrete action space is supported"
+
+    # Initialise Qnetworks
+    q_network = get_QNetwork(qnetwork, envs, device)
+    optimizer = optim.Adam(q_network.parameters(), lr=learning_rate,
+                           weight_decay=weight_decay)
+    target_network = get_QNetwork(qnetwork, envs, device)
+    target_network.load_state_dict(q_network.state_dict())
+
+    # Initialise replay buffer
+    buffer_size = int(buffer_size)
+    rb = ReplayBuffer(
+        buffer_size,
+        envs.single_observation_space,
+        envs.single_action_space,
+        device,
+        optimize_memory_usage=True,
+        handle_timeout_termination=False,
+        n_envs=num_envs
+    )
+
+    # TRY NOT TO MODIFY: start the game
+    total_returns = []
+    obs, _ = envs.reset()
+    total_timesteps = int(total_timesteps)
+    start_time = time.time()
+
+    for global_step in range(total_timesteps):
+
+        # ALGO LOGIC: put action logic here
+        epsilon = linear_schedule(
+            start_e, end_e, exploration_fraction * total_timesteps, global_step)
+
+        # Normal epsilon-greedy move with no action masking
+        # actions = epsilon_greedy(device, env, epsilon, obs, q_network)
+
+        # Implement action masking. All the codes here assumes that only a single environment
+        # is used, as that's the limitation of the replay buffer anyway.
+        actions = masked_epsilon_greedy(device, max_peaks, epsilon, obs, q_network)
+
+        # TRY NOT TO MODIFY: execute the game and log data.
+        next_obs, rewards, terminateds, truncateds, infos = envs.step(actions)
+        dones = terminateds
+
+        # TRY NOT TO MODIFY: record rewards for plotting purposes
+        if 'final_info' in infos:
+            final_infos = infos['final_info']
+
+            for info in final_infos:
+                if info is None:
+                    continue
+
+                if writer is not None:
+                    episodic_return = info['episode']['r'][0]
+                    episodic_length = info['episode']['l'][0]
+                    total_returns.append(episodic_return)
+                    elapsed_time = time.time() - start_time
+                    print(f"global_step={global_step}, episodic_return={episodic_return}, "
+                          f"episodic_length={episodic_length} elapsed={elapsed_time}s")
+                    start_time = time.time()
+                    writer.add_scalar("charts/episodic_return", episodic_return, global_step)
+                    writer.add_scalar("charts/episodic_length", episodic_length, global_step)
+                    writer.add_scalar("charts/epsilon", epsilon, global_step)
+
+        # TRY NOT TO MODIFY: save data to reply buffer; handle `terminal_observation`
+        real_next_obs = next_obs.copy()
+        for idx, d in enumerate(dones):
+            if d:
+                real_next_obs[idx] = infos["final_observation"][idx]
+            # rb.add(obs[idx], real_next_obs[idx], actions[idx], rewards[idx], dones[idx], [])
+        rb.add(obs, real_next_obs, actions, rewards, dones, infos)
+
+        # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
+        obs = next_obs
+
+        # ALGO LOGIC: training.
+        if global_step > learning_starts:
+            if global_step % train_frequency == 0:
+                data = rb.sample(batch_size)
+                with torch.no_grad():
+
+                    # shape is (batch_size, num_features)
+                    x = data.next_observations.float()
+                    action_masks = get_action_masks_from_obs(x, max_peaks)
+
+                    # Apply the mask to the online network's output to get best action
+                    online_q_values = q_network(x)
+                    min_value = float('-inf')
+                    masked_online_q_values = torch.where(action_masks, online_q_values,
+                                                         torch.tensor(min_value).to(x.device))
+                    online_actions = masked_online_q_values.argmax(dim=1).unsqueeze(1)
+
+                    # Use the selected actions to get Q-values from the target network
+                    target_q_values = target_network(x)
+                    masked_target_q_values = target_q_values.gather(1, online_actions)
+
+                    td_target = data.rewards.flatten() + gamma * masked_target_q_values.flatten() * (
+                            1 - data.dones.flatten())
+
+                x = data.observations.float()
+                old_val = q_network(x).gather(1, data.actions).squeeze()
+                loss = F.mse_loss(td_target, old_val)
+
+                if global_step % 100 == 0:
+                    writer.add_scalar("losses/td_loss", loss, global_step)
+                    writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
+                    # print("SPS:", int(global_step / (time.time() - start_time)))
+                    writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)),
+                                      global_step)
+
+                # optimize the model
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            # update target network
+            if global_step % target_network_frequency == 0:
+                for target_network_param, q_network_param in zip(target_network.parameters(),
+                                                                 q_network.parameters()):
+                    target_network_param.data.copy_(
+                        tau * q_network_param.data + (
+                                1.0 - tau) * target_network_param.data
+                    )
+
+    envs.close()
+    return q_network
+
+
 def main(args):
     current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
     run_name = f"{args.env_id}_{args.exp_name}_{current_time}"
@@ -110,145 +260,14 @@ def main(args):
             "\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     )
 
-    # TRY NOT TO MODIFY: seeding
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    torch.backends.cudnn.deterministic = args.torch_deterministic
-
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-
-    # env setup
-    num_envs = args.num_envs
-    params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
-                                          extract_chromatograms=True)
-    if args.env_type == 'async':
-        envs = gym.vector.AsyncVectorEnv(
-            [make_env(args.env_id, args.seed + i, max_peaks, params) for i in range(num_envs)])
-    else:  # sync
-        envs = gym.vector.SyncVectorEnv(
-            [make_env(args.env_id, args.seed + i, max_peaks, params) for i in range(num_envs)])
-
-    assert isinstance(envs.single_action_space,
-                      gym.spaces.Discrete), "only discrete action space is supported"
-
-    q_network = get_QNetwork(args.qnetwork, envs, device)
-    optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate,
-                           weight_decay=args.weight_decay)
-    target_network = get_QNetwork(args.qnetwork, envs, device)
-    target_network.load_state_dict(q_network.state_dict())
-
-    # TODO: ReplayBuffer only supports a single environment for now
-    # assert NUM_ENVS == 1
-    buffer_size = int(args.buffer_size)
-    rb = ReplayBuffer(
-        buffer_size,
-        envs.single_observation_space,
-        envs.single_action_space,
-        device,
-        optimize_memory_usage=True,
-        handle_timeout_termination=False,
-        n_envs=num_envs
+    q_network = training_loop(
+        args.seed, args.torch_deterministic, args.num_envs, args.env_type, args.env_id,
+        args.qnetwork, args.learning_rate, args.weight_decay, args.buffer_size, args.total_timesteps,
+        args.start_e, args.end_e, args.exploration_fraction, args.learning_starts, args.train_frequency,
+        args.batch_size, args.gamma, args.target_network_frequency, args.tau,
+        device, writer
     )
-    start_time = time.time()
-
-    # TRY NOT TO MODIFY: start the game
-    total_returns = []
-    obs, _ = envs.reset()
-    total_timesteps = int(args.total_timesteps)
-    start_time = time.time()
-    for global_step in range(total_timesteps):
-        # ALGO LOGIC: put action logic here
-        epsilon = linear_schedule(args.start_e, args.end_e,
-                                  args.exploration_fraction * total_timesteps, global_step)
-
-        # Normal epsilon-greedy move with no action masking
-        # actions = epsilon_greedy(device, env, epsilon, obs, q_network)
-
-        # Implement action masking. All the codes here assumes that only a single environment
-        # is used, as that's the limitation of the replay buffer anyway.
-        actions = masked_epsilon_greedy(device, max_peaks, epsilon, obs, q_network)
-
-        # TRY NOT TO MODIFY: execute the game and log data.
-        next_obs, rewards, terminateds, truncateds, infos = envs.step(actions)
-        dones = terminateds
-
-        # TRY NOT TO MODIFY: record rewards for plotting purposes
-        if 'final_info' in infos:
-            final_infos = infos['final_info']
-            for info in final_infos:
-                if info is None:
-                    continue
-                episodic_return = info['episode']['r'][0]
-                episodic_length = info['episode']['l'][0]
-                total_returns.append(episodic_return)
-                elapsed_time = time.time() - start_time
-                print(f"global_step={global_step}, episodic_return={episodic_return}, "
-                      f"episodic_length={episodic_length} elapsed={elapsed_time}s")
-                start_time = time.time()
-                writer.add_scalar("charts/episodic_return", episodic_return, global_step)
-                writer.add_scalar("charts/episodic_length", episodic_length, global_step)
-                writer.add_scalar("charts/epsilon", epsilon, global_step)
-
-        # TRY NOT TO MODIFY: save data to reply buffer; handle `terminal_observation`
-        real_next_obs = next_obs.copy()
-        for idx, d in enumerate(dones):
-            if d:
-                real_next_obs[idx] = infos["final_observation"][idx]
-            # rb.add(obs[idx], real_next_obs[idx], actions[idx], rewards[idx], dones[idx], [])
-        rb.add(obs, real_next_obs, actions, rewards, dones, infos)
-
-        # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
-        obs = next_obs
-
-        # ALGO LOGIC: training.
-        if global_step > args.learning_starts:
-            if global_step % args.train_frequency == 0:
-                data = rb.sample(args.batch_size)
-                with torch.no_grad():
-
-                    # shape is (batch_size, num_features)
-                    x = data.next_observations.float()
-                    action_masks = get_action_masks_from_obs(x, max_peaks)
-
-                    # Apply the mask to the online network's output to get best action
-                    online_q_values = q_network(x)
-                    min_value = float('-inf')
-                    masked_online_q_values = torch.where(action_masks, online_q_values,
-                                                         torch.tensor(min_value).to(x.device))
-                    online_actions = masked_online_q_values.argmax(dim=1).unsqueeze(1)
-
-                    # Use the selected actions to get Q-values from the target network
-                    target_q_values = target_network(x)
-                    masked_target_q_values = target_q_values.gather(1, online_actions)
-
-                    td_target = data.rewards.flatten() + args.gamma * masked_target_q_values.flatten() * (
-                            1 - data.dones.flatten())
-
-                x = data.observations.float()
-                old_val = q_network(x).gather(1, data.actions).squeeze()
-                loss = F.mse_loss(td_target, old_val)
-
-                if global_step % 100 == 0:
-                    writer.add_scalar("losses/td_loss", loss, global_step)
-                    writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
-                    # print("SPS:", int(global_step / (time.time() - start_time)))
-                    writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)),
-                                      global_step)
-
-                # optimize the model
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-            # update target network
-            if global_step % args.target_network_frequency == 0:
-                for target_network_param, q_network_param in zip(target_network.parameters(),
-                                                                 q_network.parameters()):
-                    target_network_param.data.copy_(
-                        args.tau * q_network_param.data + (
-                                1.0 - args.tau) * target_network_param.data
-                    )
 
     if args.save_model:
         model_path = f"runs/{run_name}/{args.exp_name}.model"
@@ -276,7 +295,6 @@ def main(args):
             mean_value = mean_cols.at['mean', column]
             wandb.log({f"eval/means/{column}": mean_value})
 
-    envs.close()
     writer.close()
 
     print(f"mean_episodic_return={np.mean(episodic_return)}")
