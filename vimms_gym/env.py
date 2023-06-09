@@ -231,7 +231,6 @@ class DDAEnv(gym.Env):
         state['_roi_intensities'] = normalize_roi_data(state['_roi_intensities'])
 
         state['ms_level'] = 0
-        self.num_fragmented = 0
         return state
 
     def _scan_to_state_ms2(self, dda_action, scan_to_process):
@@ -282,7 +281,6 @@ class DDAEnv(gym.Env):
         #         f.excluded = excluded
 
         state['ms_level'] = 1
-        self.num_fragmented += 1
         return state
 
     def _get_excluded(self, mz, current_rt):
@@ -377,8 +375,10 @@ class DDAEnv(gym.Env):
             if next_scan.ms_level == 1:
                 self.last_ms1_scan = next_scan
                 self.ms1_count += 1
+                self.num_fragmented = 0
             else:
                 self.ms2_count += 1
+                self.num_fragmented += 1
             self.current_scan = next_scan
         else:
             # TODO: could break wrappers .. leave the state unchanged when done?
@@ -481,7 +481,7 @@ class DDAEnv(gym.Env):
             if dda_action.ms_level == 1:
                 # compute ms1 reward
                 num_total = len(self.features)
-                reward = self._compute_ms1_reward(self.num_fragmented, num_total, MS1_REWARD_SHAPE)
+                reward = self._compute_ms1_reward(self.num_fragmented, num_total)
 
             elif dda_action.ms_level == 2:
                 if frag_events is not None:  # some chemical has been fragmented
@@ -512,27 +512,36 @@ class DDAEnv(gym.Env):
         assert -1 <= reward <= 1
         return reward
 
-    def _compute_ms1_reward(self, num_fragmented, num_total, alpha):
+    def _compute_ms1_reward(self, num_fragmented, num_total):
         """
         Calculate the MS1 reward based on the number of precursor ions that have
-        been fragmented, using a decreasing exponential function. The reward
+        been fragmented, using a stretched exponential function. The reward
         assigns more weight to early fragmented ions and gradually decreases the
         weight for later ones.
 
         Args:
             num_fragmented (int): The number of fragmented precursor ions.
             num_total (int): The total number of precursor ions in the scan.
-            alpha (float): A scaling parameter controlling the reward function shape.
 
         Returns:
             float: The MS1 reward in the range [0, 1].
         """
 
-        x = num_fragmented / num_total
-        reward = 1 - np.exp(-alpha * x)
+        # https://math.stackexchange.com/questions/3542734/alternatives-for-sigmoid-curve-
+        # starting-from-0-with-interpretable-parameters
+        # Reward starts from 0 when num_fragmented = 1, and will approach 1 as num_fragmented >= 5
+        # It should favour performing the first few early fragmentations
+        x, a, b = num_fragmented, 1, 1
+        reward = 1 - np.exp(-(x / a) ** b)
+        print(reward, num_fragmented)
         return reward
 
     def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, current_rt, feature):
+        # return self._compute_intensity_ratio_reward(chem, chem_frag_count, chem_frag_int)
+        return self._compute_apex_reward(chem, current_rt)
+        # return self._compute_intensity_gain_reward(chem, chem_frag_int)
+
+    def _compute_intensity_ratio_reward(self, chem, chem_frag_count, chem_frag_int):
 
         intensity_ratio = chem_frag_int / chem.max_intensity
 

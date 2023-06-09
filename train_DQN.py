@@ -297,9 +297,6 @@ def main(args):
 
     writer.close()
 
-    print(f"mean_episodic_return={np.mean(episodic_return)}")
-
-
 if __name__ == "__main__":
     args = parse_args()
     print('args')
