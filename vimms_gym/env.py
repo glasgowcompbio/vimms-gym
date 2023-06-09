@@ -533,7 +533,6 @@ class DDAEnv(gym.Env):
         # It should favour performing the first few early fragmentations
         x, a, b = num_fragmented, 1, 1
         reward = 1 - np.exp(-(x / a) ** b)
-        print(reward, num_fragmented)
         return reward
 
     def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, current_rt, feature):
