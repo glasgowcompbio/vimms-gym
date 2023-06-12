@@ -200,6 +200,11 @@ if __name__ == "__main__":
     set_torch_threads()
     wandb.login()
 
+    # start a new sweep
     sweep_configuration['method'] = args.sweep_method
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='DDAEnv')
     wandb.agent(sweep_id, function=sweep, count=args.sweep_count)
+
+    # continue existing sweep
+    # sweep_id = 't4op68lf'
+    # wandb.agent(sweep_id, project='DDAEnv', function=sweep, count=args.sweep_count)
