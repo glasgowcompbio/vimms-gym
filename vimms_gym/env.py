@@ -531,37 +531,49 @@ class DDAEnv(gym.Env):
         # starting-from-0-with-interpretable-parameters
         # Reward starts from 0 when num_fragmented = 1, and will approach 1 as num_fragmented >= 5
         # It should favour performing the first few early fragmentations
-        x, a, b = num_fragmented, 1, 1
-        reward = 1 - np.exp(-(x / a) ** b)
+        # x, a, b = num_fragmented, 5, 1
+        # reward = 1 - np.exp(-(x / a) ** b)
+        reward = 0
         return reward
 
     def _compute_ms2_reward(self, chem, chem_frag_int, chem_frag_count, current_rt, feature):
-        # return self._compute_intensity_ratio_reward(chem, chem_frag_count, chem_frag_int)
-        return self._compute_apex_reward(chem, current_rt)
+        return self._compute_intensity_ratio_reward(chem, chem_frag_count, chem_frag_int)
+        # return self._compute_apex_reward(chem, current_rt)
         # return self._compute_intensity_gain_reward(chem, chem_frag_int)
 
     def _compute_intensity_ratio_reward(self, chem, chem_frag_count, chem_frag_int):
 
-        intensity_ratio = chem_frag_int / chem.max_intensity
-
-        # some experiments with different values:
-        # threshold=1, k=0.1, random=-220, topN=-103
-        # threshold=3, k=0.1, random=-34, topN=51
-        # threshold=5,  k=0.1, random=70,  topN=140
-        # threshold=5,  k=0.2, random=-44, topN=44
-        # threshold=10, k=0.1, random=291, topN=271
-        # threshold=10, k=02,  random=180, topN=217
-        threshold = 5
-        k = 0.1
-
-        # Fragmentation penalty with a fixed threshold
-        if chem_frag_count > threshold:
-            fragmentation_penalty = k * (chem_frag_count - threshold)
+        log = False
+        if log:
+            intensity_ratio = np.log(chem_frag_int) / np.log(chem.max_intensity)
         else:
-            fragmentation_penalty = 0
+            intensity_ratio = chem_frag_int / chem.max_intensity
 
-        # Calculate the reward_ms2
-        reward_ms2 = np.clip(intensity_ratio - fragmentation_penalty, -1, 1)
+        penalty = True
+        if penalty:
+
+            # some experiments with different values:
+            # threshold=1, k=0.1, random=-220, topN=-103
+            # threshold=3, k=0.1, random=-34, topN=51
+            # threshold=5,  k=0.1, random=70,  topN=140
+            # threshold=5,  k=0.2, random=-44, topN=44
+            # threshold=10, k=0.1, random=291, topN=271
+            # threshold=10, k=02,  random=180, topN=217
+            threshold = 5
+            k = 0.1
+
+            # Fragmentation penalty with a fixed threshold
+            if chem_frag_count > threshold:
+                fragmentation_penalty = k * (chem_frag_count - threshold)
+            else:
+                fragmentation_penalty = 0
+
+            # Calculate the reward_ms2
+            reward_ms2 = np.clip(intensity_ratio - fragmentation_penalty, -1, 1)
+
+        else:
+            reward_ms2 = np.clip(intensity_ratio, 0, 1)
+
         return reward_ms2
 
     def _compute_intensity_gain_reward(self, chem, chem_frag_int):
