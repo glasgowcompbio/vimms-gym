@@ -1,34 +1,33 @@
-import os
 from typing import Callable
 
 import gymnasium as gym
 import pandas as pd
 import torch
-
 from vimms.Common import load_obj
 from vimms.Evaluation import EvaluationData
-from vimms_gym.common import METHOD_DQN, evaluate
-from vimms_gym.experiments import preset_qcb_medium
 
 from model.DQN_utils import masked_epsilon_greedy
+from train_DQN import get_task_params
+from vimms_gym.common import evaluate
+
 
 def evaluate_model(
         model_path: str,
         make_env: Callable,
         env_id: str,
+        task: str,
         eval_episodes: int,
         Model: torch.nn.Module,
         device: torch.device = torch.device("cpu"),
 ):
-    params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
-                                          extract_chromatograms=True)
+    # env setup
+    max_peaks, params, chem_path = get_task_params(task)
     envs = gym.vector.SyncVectorEnv([make_env(env_id, 0, max_peaks, params)])
     model = Model(envs).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
     # load evaluation dataset
-    chem_path = os.path.join('notebooks', 'QCB_resimulated_medium', 'QCB_chems_medium.p')
     chem_list = load_obj(chem_path)
     episodic_returns = []
     evaluation_results = []

@@ -7,19 +7,20 @@ from datetime import datetime
 from distutils.util import strtobool
 
 import gymnasium as gym
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
-import numpy as np
 
 from model.DQN_utils import set_torch_threads, masked_epsilon_greedy, get_action_masks_from_obs, \
     make_env, linear_schedule
 from model.QNetwork import QNETWORK_CNN, get_QNetwork
 from model.evaluation import evaluate_model
 from vimms_gym.common import METHOD_DQN
-from vimms_gym.experiments import preset_qcb_medium
+from vimms_gym.experiments import preset_qcb_medium, preset_qcb_large, ENV_QCB_MEDIUM_EXTRACTED, \
+    ENV_QCB_LARGE_EXTRACTED
 
 
 def parse_args():
@@ -50,6 +51,9 @@ def parse_args():
     parser.add_argument("--env-type", type=str, default="sync",
                         choices=["async", "sync"],
                         help="the type of environment (async or sync)")
+    parser.add_argument("--task", type=str, default=ENV_QCB_MEDIUM_EXTRACTED,
+                        choices=[ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED],
+                        help="type of tasks (QCB_resimulated_medium, QCB_resimulated_large)")
 
     # Algorithm specific arguments
     parser.add_argument("--env-id", type=str, default="DDAEnv",
@@ -87,12 +91,24 @@ def parse_args():
     return args
 
 
+def get_task_params(task):
+    assert task in [ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED], 'Invalid task type'
+    if task == ENV_QCB_MEDIUM_EXTRACTED:
+        params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
+                                              extract_chromatograms=True)
+        chem_path = os.path.join('notebooks', 'QCB_resimulated_medium', 'QCB_chems_medium.p')
+    elif task == ENV_QCB_LARGE_EXTRACTED:
+        params, max_peaks = preset_qcb_large(METHOD_DQN, alpha=0.00, beta=0.00,
+                                             extract_chromatograms=True)
+        chem_path = os.path.join('notebooks', 'QCB_resimulated_large', 'QCB_chems_large.p')
+    return max_peaks, params, chem_path
+
+
 def training_loop(seed, torch_deterministic, num_envs, env_type, env_id,
                   qnetwork, learning_rate, weight_decay, buffer_size, total_timesteps,
                   start_e, end_e, exploration_fraction, learning_starts, train_frequency,
-                  batch_size, gamma, target_network_frequency, tau,
+                  batch_size, gamma, target_network_frequency, tau, task,
                   device, writer):
-
     # TRY NOT TO MODIFY: seeding
     random.seed(seed)
     np.random.seed(seed)
@@ -100,8 +116,8 @@ def training_loop(seed, torch_deterministic, num_envs, env_type, env_id,
     torch.backends.cudnn.deterministic = torch_deterministic
 
     # env setup
-    params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
-                                          extract_chromatograms=True)
+    max_peaks, params, chem_path = get_task_params(task)
+
     if env_type == 'async':
         envs = gym.vector.AsyncVectorEnv(
             [make_env(env_id, seed + i, max_peaks, params) for i in range(num_envs)])
@@ -263,9 +279,11 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     q_network = training_loop(
         args.seed, args.torch_deterministic, args.num_envs, args.env_type, args.env_id,
-        args.qnetwork, args.learning_rate, args.weight_decay, args.buffer_size, args.total_timesteps,
-        args.start_e, args.end_e, args.exploration_fraction, args.learning_starts, args.train_frequency,
-        args.batch_size, args.gamma, args.target_network_frequency, args.tau,
+        args.qnetwork, args.learning_rate, args.weight_decay, args.buffer_size,
+        args.total_timesteps,
+        args.start_e, args.end_e, args.exploration_fraction, args.learning_starts,
+        args.train_frequency,
+        args.batch_size, args.gamma, args.target_network_frequency, args.tau, args.task,
         device, writer
     )
 
@@ -279,6 +297,7 @@ def main(args):
             model_path,
             make_env,
             args.env_id,
+            args.task,
             eval_episodes=EVAL_EPISODES,
             Model=get_QNetwork(args.qnetwork, None, None, initialise=False),
             device=device,
@@ -296,6 +315,7 @@ def main(args):
             wandb.log({f"eval/means/{column}": mean_value})
 
     writer.close()
+
 
 if __name__ == "__main__":
     args = parse_args()

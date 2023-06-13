@@ -1,5 +1,4 @@
 import argparse
-import os
 import pprint
 from datetime import datetime
 
@@ -13,20 +12,18 @@ from vimms.Evaluation import EvaluationData
 import wandb
 from model.DQN_utils import make_env, masked_epsilon_greedy, set_torch_threads
 from model.QNetwork import QNETWORK_CNN
-from train_DQN import training_loop
-from vimms_gym.common import METHOD_DQN, evaluate
-from vimms_gym.experiments import preset_qcb_medium
+from train_DQN import training_loop, get_task_params
+from vimms_gym.common import evaluate
+from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED
 
 
 # Define objective/training function
-def objective(model, env_id, device, writer, eval_episodes):
-    params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
-                                          extract_chromatograms=True)
+def objective(model, env_id, device, writer, eval_episodes, task):
+    max_peaks, params, chem_path = get_task_params(task)
     model.eval()
     envs = gym.vector.SyncVectorEnv([make_env(env_id, 0, max_peaks, params)])
 
     # load evaluation dataset
-    chem_path = os.path.join('notebooks', 'QCB_resimulated_medium', 'QCB_chems_medium.p')
     chem_list = load_obj(chem_path)
     episodic_returns = []
     evaluation_results = []
@@ -110,6 +107,9 @@ def parse_args():
                         help='No. of sweep trials')
     parser.add_argument('--sweep_method', type=str, default='bayes',
                         help='Choice of parameter sweep method. Can be "random" or "bayes"')
+    parser.add_argument("--task", type=str, default=ENV_QCB_MEDIUM_EXTRACTED,
+                        choices=[ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED],
+                        help="type of tasks (QCB_resimulated_medium, QCB_resimulated_large)")
 
     args = parser.parse_args()
     return args
@@ -133,6 +133,7 @@ def sweep():
     batch_size = args.batch_size
     qnetwork = args.qnetwork
     eval_episodes = args.eval_episodes
+    task = args.task
 
     # wandb sweep values
     learning_rate = wandb.config.learning_rate
@@ -160,11 +161,11 @@ def sweep():
         seed, torch_deterministic, num_envs, env_type, env_id,
         qnetwork, learning_rate, weight_decay, buffer_size, total_timesteps,
         start_e, end_e, exploration_fraction, learning_starts, train_frequency,
-        batch_size, gamma, target_network_frequency, tau,
+        batch_size, gamma, target_network_frequency, tau, task,
         device, writer
     )
 
-    score = objective(model, env_id, device, writer, eval_episodes)
+    score = objective(model, env_id, device, writer, eval_episodes, task)
     writer.close()
 
     wandb.log({'run:createdAt': current_time})
