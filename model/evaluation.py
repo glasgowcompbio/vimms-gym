@@ -7,7 +7,7 @@ from vimms.Common import load_obj
 from vimms.Evaluation import EvaluationData
 
 from model.DQN_utils import masked_epsilon_greedy
-from train_DQN import get_task_params
+from vimms_gym.evaluation import get_task_params
 from vimms_gym.common import evaluate
 
 

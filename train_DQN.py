@@ -18,8 +18,8 @@ from model.DQN_utils import set_torch_threads, masked_epsilon_greedy, get_action
     make_env, linear_schedule
 from model.QNetwork import QNETWORK_CNN, get_QNetwork
 from model.evaluation import evaluate_model
-from vimms_gym.common import METHOD_DQN
-from vimms_gym.experiments import preset_qcb_medium, preset_qcb_large, ENV_QCB_MEDIUM_EXTRACTED, \
+from vimms_gym.evaluation import get_task_params
+from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, \
     ENV_QCB_LARGE_EXTRACTED
 
 
@@ -89,19 +89,6 @@ def parse_args():
     args = parser.parse_args()
     # fmt: on
     return args
-
-
-def get_task_params(task):
-    assert task in [ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED], 'Invalid task type'
-    if task == ENV_QCB_MEDIUM_EXTRACTED:
-        params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
-                                              extract_chromatograms=True)
-        chem_path = os.path.join('notebooks', 'QCB_resimulated_medium', 'QCB_chems_medium.p')
-    elif task == ENV_QCB_LARGE_EXTRACTED:
-        params, max_peaks = preset_qcb_large(METHOD_DQN, alpha=0.00, beta=0.00,
-                                             extract_chromatograms=True)
-        chem_path = os.path.join('notebooks', 'QCB_resimulated_large', 'QCB_chems_large.p')
-    return max_peaks, params, chem_path
 
 
 def training_loop(seed, torch_deterministic, num_envs, env_type, env_id,

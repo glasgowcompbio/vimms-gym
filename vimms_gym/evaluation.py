@@ -1,3 +1,4 @@
+import os
 import time
 
 import numpy as np
@@ -6,6 +7,8 @@ from vimms.Evaluation import EvaluationData
 from vimms_gym.common import EVAL_F1_INTENSITY_THRESHOLD, HISTORY_HORIZON, METHOD_RANDOM, \
     METHOD_FULLSCAN, METHOD_TOPN, METHOD_PPO, METHOD_PPO_RECURRENT, METHOD_DQN, evaluate
 from vimms_gym.env import DDAEnv
+from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED, \
+    preset_qcb_medium, preset_qcb_large
 from vimms_gym.policy import random_policy, fullscan_policy, topN_policy, get_ppo_action_probs, \
     get_dqn_q_values
 from vimms_gym.wrappers import flatten_dict_observations
@@ -167,3 +170,16 @@ def pick_action(method, obs, unwrapped_obs, model, features, N, min_ms1_intensit
             action_probs = q_values  # not really ....
 
     return action, action_probs, states
+
+
+def get_task_params(task):
+    assert task in [ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED], 'Invalid task type'
+    if task == ENV_QCB_MEDIUM_EXTRACTED:
+        params, max_peaks = preset_qcb_medium(METHOD_DQN, alpha=0.00, beta=0.00,
+                                              extract_chromatograms=True)
+        chem_path = os.path.join('notebooks', 'QCB_resimulated_medium', 'QCB_chems_medium.p')
+    elif task == ENV_QCB_LARGE_EXTRACTED:
+        params, max_peaks = preset_qcb_large(METHOD_DQN, alpha=0.00, beta=0.00,
+                                             extract_chromatograms=True)
+        chem_path = os.path.join('notebooks', 'QCB_resimulated_large', 'QCB_chems_large.p')
+    return max_peaks, params, chem_path

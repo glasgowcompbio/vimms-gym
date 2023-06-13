@@ -12,7 +12,8 @@ from vimms.Evaluation import EvaluationData
 import wandb
 from model.DQN_utils import make_env, masked_epsilon_greedy, set_torch_threads
 from model.QNetwork import QNETWORK_CNN
-from train_DQN import training_loop, get_task_params
+from train_DQN import training_loop
+from vimms_gym.evaluation import get_task_params
 from vimms_gym.common import evaluate
 from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED
 
