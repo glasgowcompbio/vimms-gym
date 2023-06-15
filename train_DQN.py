@@ -115,10 +115,10 @@ def training_loop(seed, torch_deterministic, num_envs, env_type, env_id,
                       gym.spaces.Discrete), "only discrete action space is supported"
 
     # Initialise Qnetworks
-    q_network = get_QNetwork(qnetwork, envs, device)
+    q_network = get_QNetwork(qnetwork, envs, device, task)
     optimizer = optim.Adam(q_network.parameters(), lr=learning_rate,
                            weight_decay=weight_decay)
-    target_network = get_QNetwork(qnetwork, envs, device)
+    target_network = get_QNetwork(qnetwork, envs, device, task)
     target_network.load_state_dict(q_network.state_dict())
 
     # Initialise replay buffer
@@ -286,7 +286,7 @@ def main(args):
             args.env_id,
             args.task,
             eval_episodes=EVAL_EPISODES,
-            Model=get_QNetwork(args.qnetwork, None, None, initialise=False),
+            Model=get_QNetwork(args.qnetwork, None, None, args.task, initialise=False),
             device=device,
         )
 

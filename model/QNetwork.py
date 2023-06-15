@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-import numpy as np
+
+from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED
 
 QNETWORK_CNN = 'CNN'
 QNETWORK_LSTM = 'LSTM'
@@ -8,7 +9,7 @@ QNETWORK_DENSE = 'DENSE'
 QNETWORK_DENSE_FLAT = 'DENSE_FLAT'
 
 
-def get_QNetwork(qnetwork_type, envs, device, initialise=True):
+def get_QNetwork(qnetwork_type, envs, device, task, initialise=True):
     assert qnetwork_type in [QNETWORK_CNN, QNETWORK_LSTM, QNETWORK_DENSE, QNETWORK_DENSE_FLAT]
     Model = {
         QNETWORK_CNN: QNetworkCNN,
@@ -18,18 +19,29 @@ def get_QNetwork(qnetwork_type, envs, device, initialise=True):
     }[qnetwork_type]
 
     if initialise:
-        return Model(envs).to(device)
+        n_total_features = get_n_total_features(task)
+        return Model(envs, n_total_features).to(device)
     else:
         return Model
 
 
+def get_n_total_features(task):
+    # FIXME: not the best way to do this ...
+    assert task in [ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED]
+    if task == ENV_QCB_MEDIUM_EXTRACTED:
+        n_total_features = 300 + 126
+    elif task == ENV_QCB_LARGE_EXTRACTED:
+        n_total_features = 300 + 1106
+    return n_total_features
+
+
 class QNetworkCNN(nn.Module):
-    def __init__(self, env):
+    def __init__(self, env, n_total_features):
         super().__init__()
 
         self.n_hidden = [256, 256]
         self.roi_network_out = 64
-        self.n_total_features = 426
+        self.n_total_features = n_total_features
         self.n_roi = 30
         self.roi_length = 10
         self.n_roi_features = self.n_roi * self.roi_length  # 30 rois, each is length 10, so total is 300 features
@@ -94,12 +106,12 @@ class QNetworkCNN(nn.Module):
 
 
 class QNetworkDense(nn.Module):
-    def __init__(self, env):
+    def __init__(self, env, n_total_features):
         super().__init__()
 
         self.n_hidden = [256, 256]
         self.roi_network_out = 64
-        self.n_total_features = 426
+        self.n_total_features = n_total_features
         self.n_roi = 30
         self.roi_length = 10
         self.n_roi_features = self.n_roi * self.roi_length  # 30 rois, each is length 10, so total is 300 features
@@ -147,10 +159,10 @@ class QNetworkDense(nn.Module):
 
 
 class QNetworkDenseFlat(nn.Module):
-    def __init__(self, env):
+    def __init__(self, env, n_total_features):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Linear(np.array(env.single_observation_space.shape).prod(), 120),
+            nn.Linear(n_total_features, 120),
             nn.ReLU(),
             nn.Linear(120, 84),
             nn.ReLU(),
@@ -162,8 +174,8 @@ class QNetworkDenseFlat(nn.Module):
 
 
 class QNetworkLSTM(nn.Module):
-    def __init__(self, env, n_hidden=[256, 256], lstm_size=64, lstm_fc_size=32,
-                 n_total_features=426, n_roi=30, roi_length=10, aggregation_method=None):
+    def __init__(self, env, n_total_features, n_hidden=[256, 256], lstm_size=64, lstm_fc_size=32,
+                 n_roi=30, roi_length=10, aggregation_method=None):
         super().__init__()
 
         self.n_hidden = n_hidden

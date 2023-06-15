@@ -23,7 +23,7 @@ def evaluate_model(
     # env setup
     max_peaks, params, chem_path = get_task_params(task)
     envs = gym.vector.SyncVectorEnv([make_env(env_id, 0, max_peaks, params)])
-    model = Model(envs).to(device)
+    model = Model(envs, task).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
