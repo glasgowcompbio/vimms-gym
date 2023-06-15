@@ -55,16 +55,14 @@ def normalize_roi_data(roi_data):
     # find the maximum value for each ROI along the timepoint axis
     max_vals = np.max(roi_data, axis=1)
 
-    # skip any ROIs that are all zeros
-    zero_mask = max_vals != 0
-    roi_data = roi_data[zero_mask]
-    max_vals = max_vals[zero_mask]
+    # create a mask for non-zero max values
+    nonzero_mask = max_vals != 0
 
-    # divide each ROI by its respective maximum value
-    normalized_data = roi_data / max_vals[:, np.newaxis]
+    # only divide by max for ROIs where max is not zero
+    roi_data[nonzero_mask] = roi_data[nonzero_mask] / max_vals[nonzero_mask, np.newaxis]
 
     # flip the data, so last column is the most recent ROI point
-    normalized_data = np.flip(normalized_data)
+    normalized_data = np.flip(roi_data, axis=1)
 
     return normalized_data
 
