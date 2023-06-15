@@ -31,7 +31,7 @@ def get_n_total_features(task):
     # FIXME: not the best way to do this ...
     n_roi_features = 300
     if task in [ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_SMALL_EXTRACTED]:
-        n_total_features = n_roi_features + 157
+        n_total_features = n_roi_features + 157 # FIXME: not correct!
     elif task in [ENV_QCB_MEDIUM_GAUSSIAN, ENV_QCB_MEDIUM_EXTRACTED]:
         n_total_features = n_roi_features + 157
     elif task in [ENV_QCB_LARGE_GAUSSIAN, ENV_QCB_LARGE_EXTRACTED]:

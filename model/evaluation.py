@@ -7,6 +7,7 @@ from vimms.Common import load_obj
 from vimms.Evaluation import EvaluationData
 
 from model.DQN_utils import masked_epsilon_greedy
+from model.QNetwork import get_n_total_features
 from vimms_gym.evaluation import get_task_params
 from vimms_gym.common import evaluate
 
@@ -22,8 +23,9 @@ def evaluate_model(
 ):
     # env setup
     max_peaks, params, chem_path = get_task_params(task)
+    n_total_features = get_n_total_features(task)
     envs = gym.vector.SyncVectorEnv([make_env(env_id, 0, max_peaks, params)])
-    model = Model(envs, task).to(device)
+    model = Model(envs, n_total_features).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
