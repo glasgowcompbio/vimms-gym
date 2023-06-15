@@ -15,7 +15,9 @@ from model.QNetwork import QNETWORK_CNN
 from train_DQN import training_loop
 from vimms_gym.evaluation import get_task_params
 from vimms_gym.common import evaluate
-from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED
+from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, \
+    ENV_QCB_LARGE_EXTRACTED, ENV_QCB_SMALL_EXTRACTED, ENV_QCB_SMALL_GAUSSIAN, \
+    ENV_QCB_MEDIUM_GAUSSIAN, ENV_QCB_LARGE_GAUSSIAN
 
 
 # Define objective/training function
@@ -108,9 +110,13 @@ def parse_args():
                         help='No. of sweep trials')
     parser.add_argument('--sweep_method', type=str, default='bayes',
                         help='Choice of parameter sweep method. Can be "random" or "bayes"')
+
+    task_choices = [
+        ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, ENV_QCB_LARGE_GAUSSIAN,
+        ENV_QCB_SMALL_EXTRACTED, ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED,
+    ]
     parser.add_argument("--task", type=str, default=ENV_QCB_MEDIUM_EXTRACTED,
-                        choices=[ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED],
-                        help="type of tasks (QCB_resimulated_medium, QCB_resimulated_large)")
+                        choices=task_choices, help="type of tasks")
 
     args = parser.parse_args()
     return args

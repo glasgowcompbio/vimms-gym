@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 
-from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED
+from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED, \
+    ENV_QCB_SMALL_EXTRACTED, ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, \
+    ENV_QCB_LARGE_GAUSSIAN
 
 QNETWORK_CNN = 'CNN'
 QNETWORK_LSTM = 'LSTM'
@@ -27,11 +29,15 @@ def get_QNetwork(qnetwork_type, envs, device, task, initialise=True):
 
 def get_n_total_features(task):
     # FIXME: not the best way to do this ...
-    assert task in [ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED]
-    if task == ENV_QCB_MEDIUM_EXTRACTED:
-        n_total_features = 300 + 126
-    elif task == ENV_QCB_LARGE_EXTRACTED:
-        n_total_features = 300 + 1106
+    n_roi_features = 300
+    if task in [ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_SMALL_EXTRACTED]:
+        n_total_features = n_roi_features + 157
+    elif task in [ENV_QCB_MEDIUM_GAUSSIAN, ENV_QCB_MEDIUM_EXTRACTED]:
+        n_total_features = n_roi_features + 157
+    elif task in [ENV_QCB_LARGE_GAUSSIAN, ENV_QCB_LARGE_EXTRACTED]:
+        n_total_features = n_roi_features + 1207
+    else:
+        raise ValueError('Unknown task')
     return n_total_features
 
 

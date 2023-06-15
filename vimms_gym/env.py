@@ -94,6 +94,7 @@ class DDAEnv(gym.Env):
 
             # valid action indicators, last action and current ms level
             'valid_actions': spaces.MultiBinary(self.action_space_dim),
+            'current_action': spaces.Discrete(self.action_space_dim),
             'last_action': spaces.Discrete(self.action_space_dim),
             'ms_level': spaces.Discrete(2),  # either MS1 or MS2 scans
 
@@ -126,6 +127,7 @@ class DDAEnv(gym.Env):
             # valid action indicators
             'valid_actions': np.zeros(self.action_space_dim, dtype=np.int8),
             'ms_level': 0,
+            'current_action': 0,
             'last_action': 0,
 
             # various other counts
@@ -161,6 +163,7 @@ class DDAEnv(gym.Env):
             state = self._scan_to_state_ms2(dda_action, scan_to_process)
 
         state['valid_actions'][-1] = 1  # ms1 action is always valid
+        state['current_action'] = self.current_action
         state['last_action'] = self.last_action
         return state
 
@@ -318,8 +321,11 @@ class DDAEnv(gym.Env):
         self.last_ms1_scan = None
         self.last_reward = 0.0
 
-        # FIXME: set to ms1, but there's actually no last action before this
-        #        so not sure what's the best
+        # initial current action is to do an MS1 scan
+        self.current_action = self.max_peaks
+
+        # FIXME: here we also also set this to doing ms1 scan. However, there's actually no
+        #  last action before this so not sure what's the best
         self.last_action = self.max_peaks
 
         self.elapsed_scans_since_start = 0
@@ -355,6 +361,7 @@ class DDAEnv(gym.Env):
 
         # parallel environments could pass action as a one-element numpy array
         action = extract_value(action)
+        self.current_action = action
 
         # get next scan and next state
         next_scan, episode_done, dda_action, is_valid = self._one_step(

@@ -20,7 +20,8 @@ from model.QNetwork import QNETWORK_CNN, get_QNetwork
 from model.evaluation import evaluate_model
 from vimms_gym.evaluation import get_task_params
 from vimms_gym.experiments import ENV_QCB_MEDIUM_EXTRACTED, \
-    ENV_QCB_LARGE_EXTRACTED
+    ENV_QCB_LARGE_EXTRACTED, ENV_QCB_SMALL_EXTRACTED, ENV_QCB_SMALL_GAUSSIAN, \
+    ENV_QCB_MEDIUM_GAUSSIAN, ENV_QCB_LARGE_GAUSSIAN
 
 
 def parse_args():
@@ -51,9 +52,13 @@ def parse_args():
     parser.add_argument("--env-type", type=str, default="sync",
                         choices=["async", "sync"],
                         help="the type of environment (async or sync)")
+
+    task_choices = [
+        ENV_QCB_SMALL_GAUSSIAN, ENV_QCB_MEDIUM_GAUSSIAN, ENV_QCB_LARGE_GAUSSIAN,
+        ENV_QCB_SMALL_EXTRACTED, ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED,
+    ]
     parser.add_argument("--task", type=str, default=ENV_QCB_MEDIUM_EXTRACTED,
-                        choices=[ENV_QCB_MEDIUM_EXTRACTED, ENV_QCB_LARGE_EXTRACTED],
-                        help="type of tasks (QCB_resimulated_medium, QCB_resimulated_large)")
+                        choices=task_choices, help="type of tasks")
 
     # Algorithm specific arguments
     parser.add_argument("--env-id", type=str, default="DDAEnv",
