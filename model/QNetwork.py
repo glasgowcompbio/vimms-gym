@@ -29,7 +29,7 @@ class QNetworkCNN(nn.Module):
 
         self.n_hidden = [256, 256]
         self.roi_network_out = 64
-        self.n_total_features = 427
+        self.n_total_features = 426
         self.n_roi = 30
         self.roi_length = 10
         self.n_roi_features = self.n_roi * self.roi_length  # 30 rois, each is length 10, so total is 300 features
@@ -99,7 +99,7 @@ class QNetworkDense(nn.Module):
 
         self.n_hidden = [256, 256]
         self.roi_network_out = 64
-        self.n_total_features = 427
+        self.n_total_features = 426
         self.n_roi = 30
         self.roi_length = 10
         self.n_roi_features = self.n_roi * self.roi_length  # 30 rois, each is length 10, so total is 300 features
@@ -163,7 +163,7 @@ class QNetworkDenseFlat(nn.Module):
 
 class QNetworkLSTM(nn.Module):
     def __init__(self, env, n_hidden=[256, 256], lstm_size=64, lstm_fc_size=32,
-                 n_total_features=427, n_roi=30, roi_length=10, aggregation_method=None):
+                 n_total_features=426, n_roi=30, roi_length=10, aggregation_method=None):
         super().__init__()
 
         self.n_hidden = n_hidden

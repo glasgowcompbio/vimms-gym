@@ -35,7 +35,7 @@ class DDAEnv(gym.Env):
         super().__init__()
         assert len(params) > 0
         self.max_peaks = max_peaks
-        self.in_dim = self.max_peaks + 1  # 0 is for MS1
+        self.action_space_dim = self.max_peaks + 1 # last one for MS1
         self.num_roi_features = 10
 
         self.chemical_creator_params = params['chemical_creator']
@@ -70,7 +70,7 @@ class DDAEnv(gym.Env):
         """
         Defines action space
         """
-        return spaces.Discrete(self.in_dim)
+        return spaces.Discrete(self.action_space_dim)
 
     def _get_observation_space(self):
         """
@@ -93,8 +93,8 @@ class DDAEnv(gym.Env):
                 self.max_peaks, self.num_roi_features)),
 
             # valid action indicators, last action and current ms level
-            'valid_actions': spaces.MultiBinary(self.in_dim),
-            'last_action': spaces.Discrete(self.in_dim + 1),
+            'valid_actions': spaces.MultiBinary(self.action_space_dim),
+            'last_action': spaces.Discrete(self.action_space_dim),
             'ms_level': spaces.Discrete(2),  # either MS1 or MS2 scans
 
             # various other counts
@@ -124,7 +124,7 @@ class DDAEnv(gym.Env):
                                          dtype=np.float32),
 
             # valid action indicators
-            'valid_actions': np.zeros(self.in_dim, dtype=np.int8),
+            'valid_actions': np.zeros(self.action_space_dim, dtype=np.int8),
             'ms_level': 0,
             'last_action': 0,
 
@@ -165,9 +165,6 @@ class DDAEnv(gym.Env):
         return state
 
     def _scan_to_state_ms1(self, scan_to_process):
-
-        # store last action
-        self.last_action = self.in_dim
 
         # new ms1 scan, so initialise a new state
         mzs, rt, intensities = self._get_mzs_rt_intensities(scan_to_process)
@@ -239,9 +236,6 @@ class DDAEnv(gym.Env):
         state = deepcopy(self.state)
         idx = dda_action.idx
         assert idx is not None
-
-        # store last action
-        self.last_action = idx
 
         # update fragmented flag
         state['fragmented'][idx] = 1
@@ -323,7 +317,10 @@ class DDAEnv(gym.Env):
         self.episode_done = False
         self.last_ms1_scan = None
         self.last_reward = 0.0
-        self.last_action = None
+
+        # FIXME: set to ms1, but there's actually no last action before this
+        #        so not sure what's the best
+        self.last_action = self.max_peaks
 
         self.elapsed_scans_since_start = 0
         self.num_fragmented = 0
@@ -391,6 +388,7 @@ class DDAEnv(gym.Env):
                 self.last_reward = NO_FRAGMENTATION_REWARD
 
         TRUNCATED = False  # we never truncate a run
+        self.last_action = action
         return self.state, self.last_reward, self.episode_done, TRUNCATED, info
 
     def action_masks(self):
