@@ -14,12 +14,12 @@ from vimms.Common import set_log_level_warning, load_obj
 
 from vimms_gym.evaluation import run_method
 from vimms_gym.common import METHOD_TOPN, METHOD_RANDOM, evaluate
-from vimms_gym.experiments import preset_qcb_medium
+from vimms_gym.experiments import preset_qcb_medium, preset_qcb_large
 
 env_alpha = 0.00
 env_beta = 0.00
 extract = True
-params, max_peaks = preset_qcb_medium(None, alpha=env_alpha, beta=env_beta,
+params, max_peaks = preset_qcb_large(None, alpha=env_alpha, beta=env_beta,
                                       extract_chromatograms=extract)
 
 # %%
