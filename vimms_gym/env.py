@@ -385,6 +385,7 @@ class DDAEnv(gym.Env):
         self.episode_done = False
         self.last_ms1_scan = None
         self.last_reward = 0.0
+        self.last_res = 0.0
 
         # initial current action is to do an MS1 scan
         self.current_action = self.max_peaks
@@ -451,16 +452,13 @@ class DDAEnv(gym.Env):
             self.current_scan = next_scan
         else:
             # TODO: could break wrappers .. leave the state unchanged when done?
-            # self.state = None 
+            # self.state = None
             self.current_scan = None
             self.last_reward = 0
 
             # penalise if no MS2 events have been performed
             if self.ms1_count > 0 and self.ms2_count == 0:
                 self.last_reward = NO_FRAGMENTATION_REWARD
-            else:
-                res = simple_evaluate(self, intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD)
-                self.last_reward = res
 
         TRUNCATED = False  # we never truncate a run
         self.last_action = action
@@ -551,37 +549,10 @@ class DDAEnv(gym.Env):
             self.invalid_action_count += 1
         else:
 
-            if dda_action.ms_level == 1:
-                # compute ms1 reward
-                num_total = len(self.features)
-                reward = self._compute_ms1_reward(self.num_fragmented, num_total)
-
-            elif dda_action.ms_level == 2:
-                if frag_events is not None:  # some chemical has been fragmented
-
-                    # TODO: assume only 1 chemical has been fragmented
-                    # works for DDA but not for DIA
-                    frag_event = frag_events[0]
-                    chem_frag_int = frag_event.parents_intensity[0]
-
-                    # look up previous fragmented intensity for this chem
-                    chem = frag_event.chem
-                    self.frag_chem_count[chem] += 1
-                    chem_frag_count = self.frag_chem_count[chem]
-
-                    # compute ms2 reward
-                    feature = self.features[dda_action.idx]
-                    # reward = self._compute_ms2_reward(chem, chem_frag_int, chem_frag_count,
-                    #                                   frag_event.query_rt, feature)
-                    reward = 0.0
-
-                    # store new intensity and frag time into dictionaries
-                    self.frag_chem_intensity[chem] = chem_frag_int
-                    self.frag_chem_time[chem] = frag_event.query_rt
-
-                else:
-                    # fragmenting a spike noise, or no chem associated with this, so we give no reward
-                    reward = 0.0
+            res = simple_evaluate(self, intensity_threshold=EVAL_F1_INTENSITY_THRESHOLD)
+            if res > self.last_res:
+                reward = res - self.last_res
+                self.last_res = res
 
         assert -1 <= reward <= 1
         return reward
