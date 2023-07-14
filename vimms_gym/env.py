@@ -187,8 +187,12 @@ class DDAEnv(gym.Env):
             keep = True if last_datum in last_datum_to_roi else False
             keeps.append(keep)
         keeps = np.array(keeps)
-        mzs_keep = mzs[keeps]
-        intensities_keep = intensities[keeps]
+        try:
+            mzs_keep = mzs[keeps]
+            intensities_keep = intensities[keeps]
+        except IndexError:
+            mzs_keep = mzs
+            intensities_keep = intensities
 
         # Get the N most intense features first
         # now that each feature corresponds to an ROI, we can consider them the same
@@ -548,11 +552,7 @@ class DDAEnv(gym.Env):
 
     def _compute_intensity_ratio_reward(self, chem, chem_frag_count, chem_frag_int):
 
-        log = False
-        if log:
-            intensity_ratio = np.log(chem_frag_int) / np.log(chem.max_intensity)
-        else:
-            intensity_ratio = chem_frag_int / chem.max_intensity
+        intensity_ratio = chem_frag_int / chem.max_intensity
 
         penalty = True
         if penalty:

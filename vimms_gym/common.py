@@ -58,13 +58,15 @@ def clip_value(value, max_value, min_range=0.0, max_range=1.0):
     Scale value by max_value, then clip it to [-min_range, max_range]
     '''
     value = min(value, max_value) if value >= 0 else max(value, -max_value)
-    value = value / max_value
-    if value < min_range:
-        value = min_range
-    elif value > max_range:
-        value = max_range
-    return value
-
+    try:
+        value = value / max_value
+        if value < min_range:
+            value = min_range
+        elif value > max_range:
+            value = max_range
+        return value
+    except ZeroDivisionError:
+        return 0.0
 
 def scale_intensity(original_intensity, log=False):
     if log:
